@@ -1,16 +1,70 @@
-# Visual Studio
-.vs/
-*.user
-*.suo
-
-# build
+# Build results
 bin/
 obj/
+[Ll]og/
 *.log
 
-# Rider
-.idea/
+# User-specific files
+*.suo
+*.user
+*.userosscache
+*.rsuser
+*.sln.docstates
 
-# system
-Thumbs.db
-.DS_Store
+# VS folders
+.vs/
+.vscode/
+.vshistory/
+.history/
+
+# ASP.NET
+wwwroot/dist/
+wwwroot/node_modules/
+node_modules/
+*.dbmdl
+*.pfx
+*.publishsettings
+*.pubxml
+*.Publish.xml
+*.publishproj
+
+# .NET
+*.dll
+*.exe
+*.pdb
+*.cache
+*.tmp
+*.csproj.user
+*.AssemblyInfo.cs
+*.AssemblyInfoInputs.cache
+
+# Other
+*.nupkg
+*.snupkg
+*.coverage
+*.coveragexml
+*.vspx
+*.psess
+*.sdf
+*.suo
+*.sln.docstates
+*.json.swp
+*.vsidx
+*.pidb
+
+# JetBrains Rider / ReSharper
+.idea/
+_ReSharper*/
+*.DotSettings.user
+
+# Log files
+*.tlog
+*.log
+*.svclog
+
+# Others
+*.bak
+*.tmp
+*.old
+*.orig
+*.Backup*/
