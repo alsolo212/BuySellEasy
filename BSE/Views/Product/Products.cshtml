@@ -1,0 +1,28 @@
+﻿@model List<BSE.Models.Product>
+@{
+    ViewData["Title"] = "Products";
+}
+    <div class="page-content">
+        <h1>Products</h1>
+        @foreach (var product in Model)
+        {
+            <div class="container">
+                <h3>@product.ProductName</h3>
+                <table>
+                    <tbody>
+                        <tr>
+                            <td>Id</td>
+                            <td>@product.ProductId</td>
+                        </tr>
+                        <tr>
+                            <td>Price</td>
+                            <td>@product.ProductPrice</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        }
+        <div>
+            <a href="/home">Go home page</a>
+        </div>
+    </div>

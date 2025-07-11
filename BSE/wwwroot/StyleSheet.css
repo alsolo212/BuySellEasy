@@ -1,0 +1,143 @@
+﻿body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-size: 16px;
+    background-color: #f5f7fa;
+    color: #333;
+    margin: 0;
+    padding: 0;
+}
+/* Навигационная панель */
+.navbar {
+    width: 100%;
+    background-color: #ffffff;
+    border-bottom: 1px solid #dee2e6;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 32px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.navbar-brand {
+    font-size: 24px;
+    font-weight: 700;
+    color: #0077b6;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+/* Список навигации */
+.navbar-menu {
+    list-style: none;
+    display: flex;
+    gap: 24px;
+    margin: 0;
+    padding-right: 50px;
+}
+
+    .navbar-menu li {
+        display: inline;
+    }
+
+    .navbar-menu a {
+        text-decoration: none;
+        font-weight: 500;
+        color: #333;
+        padding: 8px 12px;
+        border-radius: 4px;
+        transition: background-color 0.2s ease-in-out;
+    }
+
+        .navbar-menu a:hover {
+            background-color: #f0f0f0;
+        }
+
+
+/* Контейнер */
+.container {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+/* Заголовки */
+h1, h2, h3 {
+    color: #2c3e50;
+    margin-bottom: 15px;
+}
+
+/* Ссылки */
+a {
+    color: #0077b6;
+    text-decoration: none;
+}
+
+    a:hover {
+        text-decoration: underline;
+    }
+
+/* Кнопки */
+button, .btn {
+    padding: 10px 16px;
+    border: none;
+    background-color: #6c757d;
+    color: white;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s ease-in-out;
+}
+
+    button:hover, .btn:hover {
+        background-color: #5a6268;
+    }
+
+/* Таблица */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    background-color: #ffffff;
+    border-radius: 5px;
+    margin-top: 20px;
+}
+
+th, td {
+    border: 1px solid #dee2e6;
+    padding: 12px;
+    text-align: left;
+}
+
+th {
+    background-color: #e9ecef;
+    color: #495057;
+}
+
+/* Формы */
+input[type="text"],
+input[type="email"],
+input[type="date"],
+select {
+    padding: 10px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    width: 100%;
+    box-sizing: border-box;
+    margin-bottom: 15px;
+}
+
+/* Карточка */
+.card {
+    background-color: white;
+    border: 1px solid #dcdcdc;
+    border-radius: 10px;
+    padding: 20px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+    margin-bottom: 20px;
+}
+
+.page-content {
+    padding: 10px;
+    min-height: 90vh;
+}

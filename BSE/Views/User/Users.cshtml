@@ -1,0 +1,28 @@
+﻿@model List<BSE.Models.User>
+@{
+    ViewData["Title"] = "Users";
+}
+    <div class="page-content">
+        <h1>Users</h1>
+        @foreach (var user in Model)
+        {
+            <div class="container">
+                <h3>@user.UserName</h3>
+                <table>
+                    <tbody>
+                        <tr>
+                            <td>Email</td>
+                            <td>@user.Email</td>
+                        </tr>
+                        <tr>
+                            <td>Phone</td>
+                            <td>@user.Phone</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        }
+        <div>
+            <a href="/home">Go home page</a>
+        </div>
+    </div>

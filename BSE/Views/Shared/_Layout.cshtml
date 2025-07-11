@@ -1,0 +1,30 @@
+﻿<!DOCTYPE html>
+
+<html>
+<head>
+    <meta name="viewport" content="width=device-width" />
+    <title>@ViewBag.Title</title>
+    <meta charset="utf-8" />
+    <link href="~/StyleSheet.css" rel="stylesheet" />
+</head>
+<body>
+    <div class="navbar">
+        <div class="navbar-brand"><a href="/home">BSE</a></div>
+        <nav>
+            <ul class="navbar-menu">
+                <li><a href="/products">Products</a></li>
+                <li><a href="/cart">Cart</a></li>
+                <li><a href="/users">All Users</a></li>
+                <li><a href="/profile">Profile</a></li>
+            </ul>
+        </nav>
+    </div>
+    <div class="page-content">
+        @RenderBody()
+    </div>
+    <div class="footer-content">
+        @RenderSection("footer_section", false)
+    </div>
+    @RenderSection("additonalScripts", false)
+</body>
+</html>
