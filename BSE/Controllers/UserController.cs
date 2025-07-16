@@ -1,29 +1,33 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using BSE.Models;
+﻿using Application.Interfaces;
+using Domain.Entities;
+using Microsoft.AspNetCore.Mvc;
+using ServiceContracts.Interfaces;
+using Services.Services;
 
 namespace BSE.Controllers
 {
     public class UserController : Controller
     {
+        private readonly IUserService _userService;
+
+        public UserController(IUserService userService)
+        {
+            _userService = userService;
+        }
+
         [Route("users")]
         public IActionResult Users()
         {
-            List<User> user = new List<User>()
-            {
-                new User() { UserName = "Johns", Email = "qwe@gmail.com", Phone = "0991234567", Password = "123", ConfirmPassword = "123" },
-                new User() { UserName = "Linda", Email = "rty@gmail.com", Phone = "0933215476", Password = "234", ConfirmPassword = "234" },
-                new User() { UserName = "Susan", Email = "uio@gmail.com", Phone = null, Password = "345", ConfirmPassword = "345" }
-            };
+            List<User> user = _userService.GetUsers();
+            return View(user);
 
-            if (!ModelState.IsValid)
+            /*if (!ModelState.IsValid)
             {
                 string errors = string.Join("\n", ModelState.Values.SelectMany(value => value.Errors).Select(err => err.ErrorMessage));
 
                 return BadRequest(errors);
-            }
+            }*/
             //return Content($"{user}");
-
-            return View("Users", user);
         }
     }
 }

@@ -1,23 +1,24 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using BSE.Models;
+using Services;
+using ServiceContracts.Interfaces;
 
 namespace BSE.Controllers
 {
     public class HomeController : Controller
     {
+        private readonly ICategoriesService _categoriesService;
+
+        public HomeController(ICategoriesService categoriesService)
+        {
+            _categoriesService = categoriesService;
+        }
+
         [Route("/")]
         [Route("home")]
         public IActionResult Index()
         {
-            ViewBag.ListTitle = "Categories";
-            ViewBag.ListCategories = new List<string>()
-            {
-                "All categories",
-                "Clothes",
-                "Cars",
-                "Job"
-            };
-            return View();
+            List<string> categories = _categoriesService.GetCategories();
+            return View(categories);
         }
 
         [Route("categories")]

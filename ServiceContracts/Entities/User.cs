@@ -1,6 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-namespace BSE.Models
+namespace Domain.Entities
 {
     public class User
     {
