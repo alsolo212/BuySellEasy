@@ -16,9 +16,12 @@ builder.Services.AddScoped<IUserRepository, UserList>();
 
 builder.Services.AddScoped<IProductService, ProductsService>();
 builder.Services.AddScoped<IProductRepository, ProductList>();
+builder.Services.AddSession();
+builder.Services.AddHttpContextAccessor();
 
 var app = builder.Build();
 
+app.UseSession();
 app.UseStaticFiles();
 app.UseRouting();
 app.MapControllers();

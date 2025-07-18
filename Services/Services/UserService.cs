@@ -1,11 +1,6 @@
 ﻿using Application.Interfaces;
 using Domain.Entities;
 using Domain.RepositoryContracts;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Application.Services
 {
@@ -21,6 +16,16 @@ namespace Application.Services
         public List<User> GetUsers()
         {
             return _repository.GetUsers();
+        }
+
+        public void RegisterUser(User user)
+        {
+            _repository.AddUser(user);
+        }
+
+        public User? Login(string email, string password)
+        {
+            return _repository.GetUserByEmailAndPassword(email, password);
         }
     }
 }

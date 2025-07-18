@@ -1,14 +1,11 @@
 ﻿using Domain.Entities;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Application.Interfaces
 {
     public interface IUserService
     {
         public List<User> GetUsers();
+        void RegisterUser(User user);
+        User? Login(string email, string password);
     }
 }
