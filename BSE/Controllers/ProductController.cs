@@ -14,24 +14,79 @@ namespace BSE.Controllers
             _productService = productService;
         }
 
-
         [Route("products")]
         public IActionResult Products()
         {
-            List<Product> product = _productService.GetProducts();
+            var products = _productService.GetProducts();
+            return View(products);
+        }
+
+        [HttpGet]
+        [Route("product/details/{id}")]
+        public IActionResult Details(Guid id)
+        {
+            var product = _productService.GetProductById(id);
+            if (product == null)
+                return NotFound();
+
             return View(product);
         }
 
-        [Route("details")]
-        public IActionResult Details()
+        [HttpGet]
+        [Route("product/create")]
+        public IActionResult Create()
         {
-            List<Product> product = new List<Product>()
+            return View();
+        }
+
+        [HttpPost]
+        [Route("product/create")]
+        public IActionResult Create(Product product)
+        {
+            if (ModelState.IsValid)
             {
-                new Product() { ProductId = 1, ProductName = "T-shirt", ProductPrice = 123 },
-                new Product() { ProductId = 2, ProductName = "Boots", ProductPrice = 234 },
-                new Product() { ProductId = 3, ProductName = "Watch", ProductPrice = 345 }
-            };
-            return View("Products", product);
+                product.CreatedAt = DateTime.Now;
+                _productService.AddProduct(product);
+                return RedirectToAction("Products");
+            }
+
+            ViewBag.CreateError = "Invalid input. Please check your values.";
+            return View(product);
+        }
+
+        [HttpGet]
+        [Route("product/edit/{id}")]
+        public IActionResult Edit(Guid id)
+        {
+            var product = _productService.GetProductById(id);
+            if (product == null)
+                return NotFound();
+
+            return View(product);
+        }
+
+        [HttpPost]
+        [Route("product/edit/{id}")]
+        public IActionResult Edit(Guid id, Product product)
+        {
+            if (ModelState.IsValid)
+            {
+                product.Id = id;
+                _productService.UpdateProduct(product);
+                return RedirectToAction("Products");
+            }
+
+            ViewBag.EditError = "Invalid input.";
+            return View(product);
+        }
+
+
+
+        [HttpPost("product/delete/{id}")]
+        public IActionResult Delete(Guid id)
+        {
+            _productService.DeleteProduct(id);
+            return RedirectToAction("Products");
         }
     }
 }

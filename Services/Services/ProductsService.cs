@@ -1,11 +1,6 @@
 ﻿using Application.Interfaces;
 using Domain.Entities;
 using Domain.RepositoryContracts;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Application.Services
 {
@@ -18,9 +13,10 @@ namespace Application.Services
             _repository = repository;
         }
 
-        public List<Product> GetProducts()
-        {
-            return _repository.GetProducts();
-        }
+        public List<Product> GetProducts() => _repository.GetProducts();
+        public Product? GetProductById(Guid id) => _repository.GetProductById(id);
+        public void AddProduct(Product product) => _repository.AddProduct(product);
+        public void UpdateProduct(Product product) => _repository.UpdateProduct(product);
+        public void DeleteProduct(Guid id) => _repository.DeleteProduct(id);
     }
 }

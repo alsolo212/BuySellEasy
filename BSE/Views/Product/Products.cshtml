@@ -2,27 +2,34 @@
 @{
     ViewData["Title"] = "Products";
 }
-    <div class="page-content">
-        <h1>Products</h1>
+
+<div class="page-content">
+    <h1>Products</h1>
+
+    <a class="btn add-btn" href="/product/create">Add Product</a>
+
+    <div class="product-grid">
         @foreach (var product in Model)
         {
-            <div class="container">
-                <h3>@product.ProductName</h3>
-                <table>
-                    <tbody>
-                        <tr>
-                            <td>Id</td>
-                            <td>@product.ProductId</td>
-                        </tr>
-                        <tr>
-                            <td>Price</td>
-                            <td>@product.ProductPrice</td>
-                        </tr>
-                    </tbody>
-                </table>
+            <div class="product-card" onclick="location.href='/product/details/@product.Id'" style="cursor: pointer;">
+                <div class="product-image"></div>
+                <div class="product-info">
+                    <h3 class="product-title">@product.ProductName</h3>
+                    <p class="product-condition">@product.ProductCondition</p>
+                    <p class="product-location">@product.Location — @product.CreatedAt?.ToString("dd MMMM yyyy")</p>
+                </div>
+                <div class="product-price">@product.ProductPrice?.ToString("N0") $</div>
+
+                <div class="product-actions">
+                    <a href="/product/edit/@product.Id" class="edit-btn">Edit</a>
+                    <form asp-action="Delete" asp-controller="Product" asp-route-id="@product.Id" method="post" style="display:inline;">
+                        <button class="delete-btn" type="submit">Delete</button>
+                    </form>
+                </div>
             </div>
+
         }
-        <div>
-            <a href="/home">Go home page</a>
-        </div>
     </div>
+
+    <a href="/home">Go to home page</a>
+</div>

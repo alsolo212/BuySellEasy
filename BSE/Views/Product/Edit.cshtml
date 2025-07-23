@@ -1,0 +1,48 @@
+﻿@model Domain.Entities.Product
+@{
+    ViewData["Title"] = "Edit Product";
+    var cities = new List<string> {
+        "Cherkasy", "Chernihiv", "Chernivtsi", "Dnipro", "Donetsk", "Ivano-Frankivsk",
+        "Kharkiv", "Kherson", "Khmelnytskyi", "Kirovohrad", "Kyiv", "Luhansk", "Lutsk",
+        "Lviv", "Mykolaiv", "Odesa", "Poltava", "Rivne", "Sumy", "Ternopil", "Uzhhorod",
+        "Vinnytsia", "Zaporizhzhia", "Zhytomyr"
+    };
+    var conditions = new List<string> {
+        "New", "Open Box", "Used", "Refurbished", "For parts or not working"
+    };
+}
+
+<div class="block-section" id="editProduct">
+    <h2>Edit Product</h2>
+
+    <form asp-action="Edit" asp-controller="Product" method="post">
+        <input asp-for="ProductName" placeholder="Product Name" required />
+        <br />
+        <input asp-for="Description" placeholder="Description" required />
+        <br />
+        <select asp-for="ProductCondition" required>
+            <option disabled selected value="">Select Product Condition</option>
+            @foreach (var conditions in conditions)
+            {
+                <option value="@conditions">@conditions</option>
+            }
+        </select>
+        <br />
+        <input asp-for="ProductPrice" placeholder="Product Price" required />
+        <br />
+        <select asp-for="Location" required>
+            <option disabled selected value="">Select Location</option>
+            @foreach (var city in cities)
+            {
+                <option value="@city">@city</option>
+            }
+        </select>
+
+        <button class="big-btn" type="submit">Save</button>
+    </form>
+
+    @if (ViewBag.EditError != null)
+    {
+        <p style="color: red;">@ViewBag.EditError</p>
+    }
+</div>

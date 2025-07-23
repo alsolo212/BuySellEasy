@@ -3,15 +3,72 @@ using Domain.RepositoryContracts;
 
 public class ProductList : IProductRepository
 {
-    public List<Product> Products => new List<Product>()
+    private static List<Product> _products = new List<Product>()
     {
-        new Product() { ProductId = 1, ProductName = "T-shirt", ProductPrice = 123 },
-        new Product() { ProductId = 2, ProductName = "Boots", ProductPrice = 234 },
-        new Product() { ProductId = 3, ProductName = "Watch", ProductPrice = 345 }
+        new Product()
+        {
+            Id = Guid.NewGuid(),
+            ProductName = "T-shirt",
+            Description = "Black T-shirt size L is suitable for men with a height of 180+ centimeters",
+            ProductPrice = 123,
+            Location = "Kyiv",
+            CreatedAt = DateTime.Now,
+            ProductCondition = "Used"
+        },
+        new Product()
+        {
+            Id = Guid.NewGuid(),
+            ProductName = "Boots",
+            Description = "Leather winter boots",
+            ProductPrice = 234,
+            Location = "Lviv",
+            CreatedAt = DateTime.Now,
+            ProductCondition = "Open Box"
+        },
+        new Product()
+        {
+            Id = Guid.NewGuid(),
+            ProductName = "Watch",
+            Description = "Stylish men's wristwatch",
+            ProductPrice = 345,
+            Location = "Odesa",
+            CreatedAt = DateTime.Now,
+            ProductCondition = "New"
+        }
     };
 
-    public List<Product> GetProducts()
+    public List<Product> GetProducts() => _products;
+
+    public Product? GetProductById(Guid id) =>
+        _products.FirstOrDefault(p => p.Id == id);
+
+    public void AddProduct(Product product)
     {
-        return Products;
+        if (product.Id == Guid.Empty)
+            product.Id = Guid.NewGuid();
+
+        product.CreatedAt ??= DateTime.Now;
+
+        _products.Add(product);
+    }
+
+    public void UpdateProduct(Product product)
+    {
+        var existing = _products.FirstOrDefault(p => p.Id == product.Id);
+        if (existing != null)
+        {
+            existing.ProductName = product.ProductName;
+            existing.Description = product.Description;
+            existing.ProductPrice = product.ProductPrice;
+            existing.Location = product.Location;
+            existing.ProductCondition = product.ProductCondition;
+        }
+    }
+
+    public void DeleteProduct(Guid id)
+    {
+        var product = _products.FirstOrDefault(p => p.Id == id);
+        if (product != null)
+            _products.Remove(product);
     }
 }

@@ -1,0 +1,15 @@
+﻿@model Domain.Entities.Product
+@{
+    ViewData["Title"] = "Product Details";
+}
+
+<div class="product-details">
+    <h2>@Model.ProductName</h2>
+    <p><strong>Description:</strong> @Model.Description</p>
+    <p><strong>Price:</strong> @Model.ProductPrice?.ToString("N0") $</p>
+    <p><strong>Condition:</strong> @Model.ProductCondition</p>
+    <p><strong>Location:</strong> @Model.Location</p>
+    <p><strong>Created:</strong> @Model.CreatedAt?.ToString("dd MMMM yyyy")</p>
+
+    <a href="/products">Back to Products</a>
+</div>

@@ -1,0 +1,46 @@
+﻿@model Domain.Entities.Product
+@{
+    ViewData["Title"] = "Create Product";
+    var cities = new List<string> {
+        "Cherkasy", "Chernihiv", "Chernivtsi", "Dnipro", "Donetsk", "Ivano-Frankivsk",
+        "Kharkiv", "Kherson", "Khmelnytskyi", "Kirovohrad", "Kyiv", "Luhansk", "Lutsk",
+        "Lviv", "Mykolaiv", "Odesa", "Poltava", "Rivne", "Sumy", "Ternopil", "Uzhhorod",
+        "Vinnytsia", "Zaporizhzhia", "Zhytomyr"
+    };
+    var conditions = new List<string> {
+        "New", "Open Box", "Used", "Refurbished", "For parts or not working"
+    };
+}
+<div class="block-section" id="createProduct">
+    <h2>Create Product</h2>
+    <form asp-action="Create" asp-controller="Product" method="post">
+        <input type="text" name="ProductName" placeholder="Product Name" required />
+        <br />
+        <input type="text" name="Description" placeholder="Description" required />
+        <br />
+        <select name="ProductCondition" required>
+            <option disabled selected value="">Select Product Condition</option>
+            @foreach (var conditions in conditions)
+            {
+                <option value="@conditions">@conditions</option>
+            }
+        </select>
+        <br />
+        <input type="text" name="ProductPrice" placeholder="Product Price" required />
+        <br />
+        <select name="Location" required>
+            <option disabled selected value="">Select Location</option>
+            @foreach (var city in cities)
+            {
+                <option value="@city">@city</option>
+            }
+        </select>
+        <br />
+        <button class="big-btn" type="submit">Create</button>
+    </form>
+
+    @if (ViewBag.CreateError != null)
+    {
+        <p style="color: red;">@ViewBag.CreateError</p>
+    }
+</div>
