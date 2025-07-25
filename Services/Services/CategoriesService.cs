@@ -1,7 +1,8 @@
 ﻿using Application.ServiceContracts;
+using Domain.Entities;
 using Domain.RepositoryContracts;
 
-namespace Services.Services
+namespace Application.Services
 {
     public class CategoriesService : ICategoriesService
     {
@@ -12,9 +13,7 @@ namespace Services.Services
             _repository = repository;
         }
 
-        public List<string> GetCategories()
-        {
-            return _repository.GetCategories();
-        }
+        public List<Category> GetCategories() => _repository.GetCategories();
+        public Category? GetCategoryById(Guid id) => _repository.GetCategoryById(id);
     }
 }

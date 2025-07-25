@@ -8,7 +8,7 @@ public class ProductList : IProductRepository
         new Product()
         {
             Id = Guid.NewGuid(),
-            ProductName = "T-shirt",
+            Title = "T-shirt",
             Description = "Black T-shirt size L is suitable for men with a height of 180+ centimeters",
             ProductPrice = 123,
             Location = "Kyiv",
@@ -18,7 +18,7 @@ public class ProductList : IProductRepository
         new Product()
         {
             Id = Guid.NewGuid(),
-            ProductName = "Boots",
+            Title = "Boots",
             Description = "Leather winter boots",
             ProductPrice = 234,
             Location = "Lviv",
@@ -28,7 +28,7 @@ public class ProductList : IProductRepository
         new Product()
         {
             Id = Guid.NewGuid(),
-            ProductName = "Watch",
+            Title = "Watch",
             Description = "Stylish men's wristwatch",
             ProductPrice = 345,
             Location = "Odesa",
@@ -57,7 +57,7 @@ public class ProductList : IProductRepository
         var existing = _products.FirstOrDefault(p => p.Id == product.Id);
         if (existing != null)
         {
-            existing.ProductName = product.ProductName;
+            existing.Title = product.Title;
             existing.Description = product.Description;
             existing.ProductPrice = product.ProductPrice;
             existing.Location = product.Location;

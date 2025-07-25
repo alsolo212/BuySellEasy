@@ -1,7 +1,10 @@
-﻿namespace Application.ServiceContracts
+﻿using Domain.Entities;
+
+namespace Application.ServiceContracts
 {
     public interface ICategoriesService
     {
-        List<string> GetCategories();
+        public List<Category> GetCategories();
+        Category? GetCategoryById(Guid id);
     }
 }

@@ -1,5 +1,4 @@
-﻿@model IEnumerable<string>
-@inject IConfiguration imia
+﻿@model List<Domain.Entities.Category>
 
 @{
     ViewData["Title"] = "Buy sell easy";
@@ -7,9 +6,10 @@
 <div>
     <h1>Categories</h1>
     <ul>
-        @foreach (string category in Model)
+        <li><a href="/categories">All categories</a></li>
+        @foreach (var category in Model)
         {
-            <li>@category</li>
+            <li>@category.Name</li>
         }
     </ul>
     

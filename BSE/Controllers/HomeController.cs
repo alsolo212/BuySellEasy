@@ -1,5 +1,6 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using Application.ServiceContracts;
+﻿using Application.ServiceContracts;
+using Domain.Entities;
+using Microsoft.AspNetCore.Mvc;
 
 namespace BSE.Controllers
 {
@@ -16,7 +17,7 @@ namespace BSE.Controllers
         [Route("home")]
         public IActionResult Index()
         {
-            List<string> categories = _categoriesService.GetCategories();
+            var categories = _categoriesService.GetCategories();
             return View(categories);
         }
 
