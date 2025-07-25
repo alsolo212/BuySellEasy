@@ -1,4 +1,4 @@
-﻿using Application.Interfaces;
+﻿using Application.ServiceContracts;
 using Domain.Entities;
 using Domain.RepositoryContracts;
 

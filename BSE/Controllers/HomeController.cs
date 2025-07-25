@@ -1,6 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using Services;
-using ServiceContracts.Interfaces;
+using Application.ServiceContracts;
 
 namespace BSE.Controllers
 {

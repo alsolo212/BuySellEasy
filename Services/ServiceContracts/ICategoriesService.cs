@@ -1,4 +1,4 @@
-﻿namespace ServiceContracts.Interfaces
+﻿namespace Application.ServiceContracts
 {
     public interface ICategoriesService
     {

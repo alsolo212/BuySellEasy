@@ -1,9 +1,7 @@
-using Application.Interfaces;
+using Application.ServiceContracts;
 using Application.Services;
 using Domain.RepositoryContracts;
 using Infrastructure.Lists;
-using Microsoft.Extensions.DependencyInjection;
-using ServiceContracts.Interfaces;
 using Services.Services;
 
 var builder = WebApplication.CreateBuilder(args);

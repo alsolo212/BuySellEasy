@@ -1,7 +1,6 @@
-﻿using Application.Interfaces;
+﻿using Application.ServiceContracts;
 using Domain.Entities;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Http;
 
 namespace BSE.Controllers
 {

@@ -1,4 +1,4 @@
-﻿using ServiceContracts.Interfaces;
+﻿using Application.ServiceContracts;
 using Domain.RepositoryContracts;
 
 namespace Services.Services
