@@ -5,7 +5,7 @@ namespace Infrastructure.Lists
 {
     public class CategoryList : ICategoriesRepository
     {
-        private static List<Category> _category = new List<Category>()
+        public static List<Category> _category = new List<Category>()
         {
             new Category()
             {
@@ -33,10 +33,7 @@ namespace Infrastructure.Lists
                 Name = "Pets"
             }
         };
-        public List<Category> GetCategories() => _category;
 
-        public Category? GetCategoryById(Guid id) =>
-            _category.FirstOrDefault(p => p.Id == id);
-
+        public List<Category> Categories => _category;
     }
 }

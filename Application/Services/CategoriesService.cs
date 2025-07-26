@@ -13,7 +13,14 @@ namespace Application.Services
             _repository = repository;
         }
 
-        public List<Category> GetCategories() => _repository.GetCategories();
-        public Category? GetCategoryById(Guid id) => _repository.GetCategoryById(id);
+        public List<Category> GetCategories()
+        {
+            return _repository.Categories.ToList();
+        }
+
+        public Category? GetCategoryById(Guid id)
+        {
+            return _repository.Categories.FirstOrDefault(p => p.Id == id);
+        }
     }
 }
