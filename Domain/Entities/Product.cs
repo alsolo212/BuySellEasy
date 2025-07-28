@@ -1,8 +1,12 @@
-﻿namespace Domain.Entities
+﻿using System.ComponentModel.DataAnnotations;
+
+namespace Domain.Entities
 {
     public class Product
     {
+        [Key]
         public Guid Id { get; set; } = Guid.NewGuid();
+        [StringLength(35)]
         public string? Title { get; set; }
         public string? Description { get; set; }
         public double? ProductPrice { get; set; }
