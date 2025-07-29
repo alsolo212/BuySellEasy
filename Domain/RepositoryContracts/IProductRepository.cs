@@ -2,8 +2,8 @@
 
 namespace Domain.RepositoryContracts
 {
-    public interface IProductRepository
+    public interface IProductRepository : IGenericRepository<Product>
     {
-        List<Product> Products { get; }
+        //List<Product> Products { get; }
     }
 }

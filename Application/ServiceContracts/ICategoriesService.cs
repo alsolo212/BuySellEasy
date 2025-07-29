@@ -4,7 +4,7 @@ namespace Application.ServiceContracts
 {
     public interface ICategoriesService
     {
-        public List<Category> GetCategories();
-        Category? GetCategoryById(Guid id);
+        public Task<List<Category>> GetCategories();
+        public Task<Category?> GetCategoryById(Guid id);
     }
 }

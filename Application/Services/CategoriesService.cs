@@ -13,14 +13,15 @@ namespace Application.Services
             _repository = repository;
         }
 
-        public List<Category> GetCategories()
+        public async Task<List<Category>> GetCategories()
         {
-            return _repository.Categories.ToList();
+            var categories = await _repository.GetAllValuesAsync();
+            return categories?.ToList() ?? new List<Category>();
         }
 
-        public Category? GetCategoryById(Guid id)
+        public async Task<Category?> GetCategoryById(Guid id)
         {
-            return _repository.Categories.FirstOrDefault(p => p.Id == id);
+            return await _repository.GetValueByIdAsync(id);
         }
     }
 }

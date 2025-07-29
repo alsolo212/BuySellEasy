@@ -13,29 +13,31 @@ namespace Application.Services
             _repository = repository;
         }
 
-        public List<Product> GetProducts()
+        public async Task<List<Product>> GetProducts()
         {
-            return _repository.Products.ToList(); // Возвращаем копию, чтобы не было внешнего изменения
+            var products = await _repository.GetAllValuesAsync();
+            return products?.ToList() ?? new List<Product>();
         }
 
-        public Product? GetProductById(Guid id)
+        public async Task<Product?> GetProductById(Guid id)
         {
-            return _repository.Products.FirstOrDefault(p => p.Id == id);
+            return await _repository.GetValueByIdAsync(id);
         }
 
-        public void AddProduct(Product product)
+        public async Task AddProduct(Product product)
         {
             if (product.Id == Guid.Empty)
                 product.Id = Guid.NewGuid();
 
             product.CreatedAt ??= DateTime.Now;
 
-            _repository.Products.Add(product);
+            await _repository.AddAsync(product);
+            await _repository.SaveAsync();
         }
 
-        public void UpdateProduct(Product product)
+        public async Task UpdateProduct(Product product)
         {
-            var existing = _repository.Products.FirstOrDefault(p => p.Id == product.Id);
+            var existing = await _repository.GetValueByIdAsync(product.Id);
             if (existing != null)
             {
                 existing.Title = product.Title;
@@ -43,14 +45,20 @@ namespace Application.Services
                 existing.ProductPrice = product.ProductPrice;
                 existing.Location = product.Location;
                 existing.ProductCondition = product.ProductCondition;
+
+                _repository.UpdateObject(existing);
+                await _repository.SaveAsync();
             }
         }
 
-        public void DeleteProduct(Guid id)
+        public async Task DeleteProduct(Guid id)
         {
-            var product = _repository.Products.FirstOrDefault(p => p.Id == id);
+            var product = await _repository.GetValueByIdAsync(id);
             if (product != null)
-                _repository.Products.Remove(product);
+            {
+                _repository.DeleteElement(product);
+                await _repository.SaveAsync();
+            }
         }
     }
 }

@@ -1,8 +1,9 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using Domain.Abstractions;
+using System.ComponentModel.DataAnnotations;
 
 namespace Domain.Entities
 {
-    public class Product
+    public class Product : IHasId
     {
         [Key]
         public Guid Id { get; set; } = Guid.NewGuid();

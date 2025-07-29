@@ -4,10 +4,14 @@ namespace Application.ServiceContracts
 {
     public interface IProductService
     {
-        public List<Product> GetProducts();
-        Product? GetProductById(Guid id);
-        void AddProduct(Product product);
-        void UpdateProduct(Product product);
-        void DeleteProduct(Guid id);
+        public Task<List<Product>> GetProducts();
+
+        public Task<Product?> GetProductById(Guid id);
+
+        public Task AddProduct(Product product);
+
+        public Task UpdateProduct(Product product);
+
+        public Task DeleteProduct(Guid id);
     }
 }

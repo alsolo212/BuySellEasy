@@ -15,11 +15,12 @@ namespace BSE.Controllers
 
         [Route("/")]
         [Route("home")]
-        public IActionResult Index()
+        public async Task<IActionResult> Index()
         {
-            var categories = _categoriesService.GetCategories();
+            var categories = await _categoriesService.GetCategories();
             return View(categories);
         }
+
 
         [Route("categories")]
         public IActionResult Categories()

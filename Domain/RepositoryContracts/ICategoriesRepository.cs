@@ -2,8 +2,8 @@
 
 namespace Domain.RepositoryContracts
 {
-    public interface ICategoriesRepository
+    public interface ICategoriesRepository : IGenericRepository<Category>
     {
-        List<Category> Categories { get; }
+        //List<Category> Categories { get; }
     }
 }
