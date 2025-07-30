@@ -13,7 +13,10 @@
 }
 <div class="block-section" id="createProduct">
     <h2>Create Product</h2>
-    <form asp-action="Create" asp-controller="Product" method="post">
+    <form asp-action="Create" method="post" enctype="multipart/form-data">
+        <label>Product Photos (up to 40):</label>
+        <input type="file" name="photos" multiple />
+        <br />
         <input type="text" name="Title" placeholder="Title" required />
         <br />
         <input type="text" name="Description" placeholder="Description" required />

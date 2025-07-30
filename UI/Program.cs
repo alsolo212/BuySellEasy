@@ -17,6 +17,10 @@ builder.Services.AddScoped<IUserRepository, UserList>();
 builder.Services.AddScoped<IProductService, ProductsService>();
 builder.Services.AddScoped<IProductRepository, ProductRepository>();
 
+builder.Services.AddScoped<IProductImageRepository, ProductImageRepository>();
+builder.Services.AddScoped<IProductImageService, ProductImagesService>();
+
+
 builder.Services.AddDbContext<ProductDbContext>(options => { options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")); });
 //Data Source=(localdb)\MSSQLLocalDB;Initial Catalog=BSEdatabase;Integrated Security=True;Connect Timeout=30;Encrypt=False;Trust Server Certificate=False;Application Intent=ReadWrite;Multi Subnet Failover=False
 

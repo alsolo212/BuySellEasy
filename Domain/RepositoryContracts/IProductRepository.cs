@@ -4,6 +4,7 @@ namespace Domain.RepositoryContracts
 {
     public interface IProductRepository : IGenericRepository<Product>
     {
-        //List<Product> Products { get; }
+        Task<Product?> GetProductWithImagesAsync(Guid id);
+        Task<IEnumerable<Product>> GetAllWithImagesAsync();
     }
 }

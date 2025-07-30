@@ -15,13 +15,14 @@ namespace Application.Services
 
         public async Task<List<Product>> GetProducts()
         {
-            var products = await _repository.GetAllValuesAsync();
+            var products = await _repository.GetAllWithImagesAsync();
             return products?.ToList() ?? new List<Product>();
         }
 
         public async Task<Product?> GetProductById(Guid id)
         {
-            return await _repository.GetValueByIdAsync(id);
+            // Теперь подгружаем продукт вместе с фотографиями
+            return await _repository.GetProductWithImagesAsync(id);
         }
 
         public async Task AddProduct(Product product)

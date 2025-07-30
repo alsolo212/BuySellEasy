@@ -15,7 +15,10 @@
 <div class="block-section" id="editProduct">
     <h2>Edit Product</h2>
 
-    <form asp-action="Edit" asp-controller="Product" method="post">
+    <form asp-action="Edit" asp-controller="Product" method="post" enctype="multipart/form-data">
+        <label>Upload New Photos (up to 40):</label>
+        <input type="file" name="photos" multiple accept="image/*" />
+        <br />
         <input asp-for="Title" placeholder="Title" required />
         <br />
         <input asp-for="Description" placeholder="Description" required />

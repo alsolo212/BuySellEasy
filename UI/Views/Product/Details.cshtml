@@ -5,6 +5,23 @@
 
 <div class="product-details">
     <h2>@Model.Title</h2>
+
+    @if (Model.Images != null && Model.Images.Any())
+    {
+        <div class="product-gallery" style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px;">
+            @foreach (var img in Model.Images)
+            {
+                <img src="@img.ImagePath" alt="Product Image" style="width: 200px; height: auto; border-radius: 8px;" />
+            }
+        </div>
+    }
+    else
+    {
+        <div style="width:200px; height:150px; background:#eee; display:flex; align-items:center; justify-content:center; margin-bottom:20px;">
+            <span>No images available</span>
+        </div>
+    }
+
     <p><strong>Description:</strong> @Model.Description</p>
     <p><strong>Price:</strong> @Model.ProductPrice?.ToString("N0") $</p>
     <p><strong>Condition:</strong> @Model.ProductCondition</p>

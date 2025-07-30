@@ -12,7 +12,18 @@
         @foreach (var product in Model)
         {
             <div class="product-card" onclick="location.href='/product/details/@product.Id'" style="cursor: pointer;">
-                <div class="product-image"></div>
+                <div class="product-image">
+                    @if (product.Images?.Count > 0)
+                    {
+                        <img src="@product.Images.First().ImagePath" alt="product" style="width:100%; height:auto;" />
+                    }
+                    else
+                    {
+                        <div style="width:100%; height:150px; background-color:#eee; display:flex; align-items:center; justify-content:center;">
+                            <span>No image</span>
+                        </div>
+                    }
+                </div>
                 <div class="product-info">
                     <h3 class="product-title">@product.Title</h3>
                     <p class="product-condition">@product.ProductCondition</p>

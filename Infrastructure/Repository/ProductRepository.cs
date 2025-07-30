@@ -12,5 +12,19 @@ namespace Infrastructure.Repository
         {
             _dbSet = dbContext.Set<Product>();
         }
+        public async Task<Product?> GetProductWithImagesAsync(Guid id)
+        {
+            return await _dbSet
+                .Include(p => p.Images) // Подключаем связанные изображения
+                .FirstOrDefaultAsync(p => p.Id == id);
+        }
+
+        public async Task<IEnumerable<Product>> GetAllWithImagesAsync()
+        {
+            return await _dbSet
+                .Include(p => p.Images)
+                .ToListAsync();
+        }
+
     }
 }

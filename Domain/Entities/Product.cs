@@ -14,5 +14,7 @@ namespace Domain.Entities
         public DateTime? CreatedAt { get; set; } = DateTime.Now;
         public string? Location { get; set; }
         public string? ProductCondition { get; set; }
+
+        public ICollection<ProductImage> Images { get; set; } = new List<ProductImage>();
     }
 }

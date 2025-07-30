@@ -7,10 +7,12 @@ namespace BSE.Controllers
     public class ProductController : Controller
     {
         private readonly IProductService _productService;
+        private readonly IProductImageService _productImageService;
 
-        public ProductController(IProductService productService)
+        public ProductController(IProductService productService, IProductImageService productImageService)
         {
             _productService = productService;
+            _productImageService = productImageService;
         }
 
         [Route("products")]
@@ -40,18 +42,55 @@ namespace BSE.Controllers
 
         [HttpPost]
         [Route("product/create")]
-        public async Task<IActionResult> Create(Product product)
+        public async Task<IActionResult> Create(Product product, List<IFormFile> photos)
         {
-            if (ModelState.IsValid)
+            if (!ModelState.IsValid)
             {
-                product.CreatedAt = DateTime.Now;
-                await _productService.AddProduct(product);
-                return RedirectToAction("Products");
+                ViewBag.CreateError = "Invalid input.";
+                return View(product);
             }
 
-            ViewBag.CreateError = "Invalid input. Please check your values.";
-            return View(product);
+            product.CreatedAt = DateTime.Now;
+
+            // Сначала добавим продукт, чтобы получить его Id
+            await _productService.AddProduct(product);
+
+            // Обработка загрузки фотографий
+            if (photos != null && photos.Count > 0)
+            {
+                string uploadPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", "product-photos");
+
+                if (!Directory.Exists(uploadPath))
+                    Directory.CreateDirectory(uploadPath);
+
+                foreach (var photo in photos.Take(40))
+                {
+                    if (photo.Length > 0)
+                    {
+                        var fileName = Guid.NewGuid() + Path.GetExtension(photo.FileName);
+                        var filePath = Path.Combine(uploadPath, fileName);
+
+                        using (var stream = new FileStream(filePath, FileMode.Create))
+                        {
+                            await photo.CopyToAsync(stream);
+                        }
+
+                        var image = new ProductImage
+                        {
+                            Id = Guid.NewGuid(),
+                            ProductId = product.Id, // Здесь используем product.Id, а не id
+                            ImagePath = $"/uploads/product-photos/{fileName}"
+                        };
+
+                        await _productImageService.AddProductImage(image);
+                    }
+                }
+            }
+
+            return RedirectToAction("Products");
         }
+
+
 
         [HttpGet]
         [Route("product/edit/{id}")]
@@ -66,7 +105,7 @@ namespace BSE.Controllers
 
         [HttpPost]
         [Route("product/edit/{id}")]
-        public async Task<IActionResult> Edit(Guid id, Product product)
+        public async Task<IActionResult> Edit(Guid id, Product product, List<IFormFile> photos)
         {
             if (ModelState.IsValid)
             {
