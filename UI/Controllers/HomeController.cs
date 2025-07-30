@@ -27,5 +27,11 @@ namespace BSE.Controllers
         {
             return View();
         }
+
+        [Route("cart")]
+        public IActionResult Cart()
+        {
+            return View();
+        }
     }
 }
