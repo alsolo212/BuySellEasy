@@ -1,7 +1,6 @@
 ﻿using Application.ServiceContracts;
 using Domain.Entities;
 using Domain.RepositoryContracts;
-using System.IO;
 
 namespace Application.Services
 {
@@ -16,39 +15,18 @@ namespace Application.Services
 
         public async Task<List<Product>> GetProducts()
         {
-            var products = (await _repository.GetAllWithImagesAsync()).ToList();
-            VerifyProductImages(products);
-            return products;
+            var products = await _repository.GetAllWithImagesAsync();
+            return products?.ToList() ?? new List<Product>();
         }
 
         public async Task<Product?> GetProductById(Guid id)
         {
             var product = await _repository.GetProductWithImagesAsync(id);
-            if (product != null)
+            if (product != null && product.Images != null)
             {
-                VerifyProductImages(new List<Product> { product });
+                product.Images = product.Images.Where(img => File.Exists(GetImagePhysicalPath(img.ImagePath))).ToList();
             }
             return product;
-        }
-
-        public void VerifyProductImages(List<Product> products)
-        {
-            foreach (var product in products)
-            {
-                if (product.Images != null)
-                {
-                    var validImages = new List<ProductImage>();
-                    foreach (var image in product.Images)
-                    {
-                        var filePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", image.ImagePath.TrimStart('/'));
-                        if (File.Exists(filePath))
-                        {
-                            validImages.Add(image);
-                        }
-                    }
-                    product.Images = validImages;
-                }
-            }
         }
 
         public async Task AddProduct(Product product)
@@ -87,7 +65,7 @@ namespace Application.Services
                 {
                     foreach (var image in product.Images)
                     {
-                        var filePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", image.ImagePath.TrimStart('/'));
+                        var filePath = GetImagePhysicalPath(image.ImagePath);
                         if (File.Exists(filePath))
                         {
                             File.Delete(filePath);
@@ -98,6 +76,11 @@ namespace Application.Services
                 _repository.DeleteElement(product);
                 await _repository.SaveAsync();
             }
+        }
+
+        private string GetImagePhysicalPath(string imagePath)
+        {
+            return Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", imagePath.TrimStart('/'));
         }
     }
 }
