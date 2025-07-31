@@ -11,8 +11,9 @@
         <div class="product-gallery" style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px;">
             @foreach (var img in Model.Images)
             {
-                <img src="@img.ImagePath" alt="Product Image" style="width: 200px; height: auto; border-radius: 8px;" />
+                <img src="@img.ImagePath" alt="Product Image" style="width:200px;" />
             }
+
         </div>
     }
     else

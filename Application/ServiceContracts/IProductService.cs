@@ -8,6 +8,8 @@ namespace Application.ServiceContracts
 
         public Task<Product?> GetProductById(Guid id);
 
+        public void VerifyProductImages(List<Product> products);
+
         public Task AddProduct(Product product);
 
         public Task UpdateProduct(Product product);
