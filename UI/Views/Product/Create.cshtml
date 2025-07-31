@@ -14,9 +14,20 @@
 <div class="block-section" id="createProduct">
     <h2>Create Product</h2>
     <form asp-action="Create" method="post" enctype="multipart/form-data">
-        <label>Product Photos (up to 40):</label>
-        <input type="file" name="photos" multiple />
-        <br />
+        <div class="new-photos">
+            <div class="upload-container">
+                <div class="drop-area" id="dropArea">
+                    <div id="photoPreview" class="preview-grid"></div>
+                    <div class="drop-content">
+                        <span class="upload-icon">📷</span>
+                        <p class="drop-text">Drag & Drop photos here</p>
+                        <p class="or-text">or</p>
+                        <label for="photoUpload" class="browse-btn">📁 Browse Files</label>
+                        <input type="file" id="photoUpload" name="photos" multiple accept="image/*" />
+                    </div>
+                </div>
+            </div>
+        </div>
         <input type="text" name="Title" placeholder="Title" required />
         <br />
         <input type="text" name="Description" placeholder="Description" required />

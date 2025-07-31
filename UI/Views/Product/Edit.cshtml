@@ -15,37 +15,78 @@
 <div class="block-section" id="editProduct">
     <h2>Edit Product</h2>
 
-    <form asp-action="Edit" asp-controller="Product" method="post" enctype="multipart/form-data">
-        <label>Upload New Photos (up to 40):</label>
-        <input type="file" name="photos" multiple accept="image/*" />
-        <br />
-        <input asp-for="Title" placeholder="Title" required />
-        <br />
-        <input asp-for="Description" placeholder="Description" required />
-        <br />
-        <select asp-for="ProductCondition" required>
-            <option disabled selected value="">Select Product Condition</option>
-            @foreach (var conditions in conditions)
-            {
-                <option value="@conditions">@conditions</option>
-            }
-        </select>
-        <br />
-        <input asp-for="ProductPrice" placeholder="Product Price" required />
-        <br />
-        <select asp-for="Location" required>
-            <option disabled selected value="">Select Location</option>
-            @foreach (var city in cities)
-            {
-                <option value="@city">@city</option>
-            }
-        </select>
+    <form asp-action="Edit" asp-controller="Product" method="post" enctype="multipart/form-data" id="editForm">
+        <input type="hidden" asp-for="Id" />
+
+        <!-- Скрытое поле для хранения ID фото для удаления -->
+        <input type="hidden" id="deleteImagesInput" name="deleteImages" value="" />
+
+        <!-- Контейнер для существующих фото -->
+        <div class="existing-photos">
+            <h3>Current Photos:</h3>
+            <div class="photo-grid" id="photoGrid">
+                @if (Model.Images != null && Model.Images.Any())
+                {
+                    @foreach (var image in Model.Images)
+                    {
+                        <div class="photo-item" data-image-id="@image.Id">
+                            <img src="@image.ImagePath" alt="Product photo" />
+                            <div class="delete-photo-btn" title="Delete photo">🗙</div>
+                        </div>
+                    }
+                }
+                else
+                {
+                    <p>No photos yet</p>
+                }
+            </div>
+        </div>
+
+        <!-- Поле для загрузки новых фото -->
+        <div class="new-photos">
+            <div class="upload-container">
+                <div class="drop-area" id="dropArea">
+                    <div id="photoPreview" class="preview-grid"></div>
+                    <div class="drop-content">
+                        <span class="upload-icon">📷</span>
+                        <p class="drop-text">Drag & Drop photos here</p>
+                        <p class="or-text">or</p>
+                        <label for="photoUpload" class="browse-btn">📁 Browse Files</label>
+                        <input type="file" id="photoUpload" name="photos" multiple accept="image/*" />
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+        <!-- Основные поля продукта -->
+            <input asp-for="Title" placeholder="Title" required />
+            <br />
+            <input asp-for="Description" placeholder="Description" required />
+            <br />
+            <select asp-for="ProductCondition" required>
+                <option disabled selected value="">Select Product Condition</option>
+                @foreach (var condition in conditions)
+                {
+                    <option value="@condition">@condition</option>
+                }
+            </select>
+            <br />
+            <input asp-for="ProductPrice" placeholder="Product Price" required />
+            <br />
+            <select asp-for="Location" required>
+                <option disabled selected value="">Select Location</option>
+                @foreach (var city in cities)
+                {
+                    <option value="@city">@city</option>
+                }
+            </select>
 
         <button class="big-btn" type="submit">Save</button>
     </form>
 
     @if (ViewBag.EditError != null)
     {
-        <p style="color: red;">@ViewBag.EditError</p>
+        <div class="alert alert-danger mt-3">@ViewBag.EditError</div>
     }
 </div>

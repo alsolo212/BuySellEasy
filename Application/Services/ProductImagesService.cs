@@ -1,6 +1,7 @@
 ﻿using Application.ServiceContracts;
 using Domain.Entities;
 using Domain.RepositoryContracts;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace Application.Services
 {
@@ -51,6 +52,13 @@ namespace Application.Services
             var productImage = await _repository.GetValueByIdAsync(id);
             if (productImage != null)
             {
+                var filePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", productImage.ImagePath.TrimStart('/'));
+                if (File.Exists(filePath))
+                {
+                    File.Delete(filePath);
+                }
+
+                // Удаляем запись из БД
                 _repository.DeleteElement(productImage);
                 await _repository.SaveAsync();
             }
