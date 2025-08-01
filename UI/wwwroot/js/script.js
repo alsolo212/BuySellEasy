@@ -46,12 +46,12 @@
                 previewItem.className = 'preview-item';
                 previewItem.innerHTML = `
                     <img src="${e.target.result}" alt="Preview" />
-                    <button class="remove-preview-btn" type="button">🗙</button>
+                    <button class="delete-photo-btn" type="button">🗙</button>
                 `;
                 photoPreview.appendChild(previewItem);
 
                 // Обработчик удаления превью
-                const removeBtn = previewItem.querySelector('.remove-preview-btn');
+                const removeBtn = previewItem.querySelector('.delete-photo-btn');
                 removeBtn.addEventListener('click', (e) => {
                     e.stopPropagation();
                     const index = filesArray.indexOf(file);
