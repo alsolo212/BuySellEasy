@@ -10,6 +10,7 @@
     var conditions = new List<string> {
         "New", "Open Box", "Used", "Refurbished", "For parts or not working"
     };
+    int visualCounter = 1;
 }
 
 <div class="block-section" id="editProduct">
@@ -30,7 +31,7 @@
                     @foreach (var image in Model.Images.OrderBy(i => i.SortOrder))
                     {
                         <div class="photo-item" data-image-id="@image.Id">
-                            <span class="photo-order">@image.SortOrder</span>
+                            <span class="photo-order">@(visualCounter++)</span>
                             <img src="@image.ImagePath" alt="Product photo" />
                             <div class="delete-photo-btn" title="Delete photo">🗙</div>
                         </div>
