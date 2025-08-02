@@ -395,6 +395,21 @@ select {
         background-color: rgba(255, 0, 0, 0.7);
     }
 
+.photo-order {
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    background: rgba(0,0,0,0.7);
+    color: #fff;
+    border: none;
+    height: 22px;
+    align-items: center;
+    justify-content: center;
+    padding: 2px 5px 0px 5px;
+    border-radius: 20%;
+    font-size: 14px;
+}
+
 /* Поле загрузки новых фото */
 .new-photos {
     margin-bottom: 30px;

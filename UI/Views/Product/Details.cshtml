@@ -9,11 +9,10 @@
     @if (Model.Images != null && Model.Images.Any())
     {
         <div class="product-gallery" style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px;">
-            @foreach (var img in Model.Images)
+            @foreach (var img in Model.Images.OrderBy(img => img.SortOrder))
             {
                 <img src="@img.ImagePath" alt="Product Image" style="width:200px;" />
             }
-
         </div>
     }
     else
@@ -27,7 +26,7 @@
     <p><strong>Price:</strong> @Model.ProductPrice?.ToString("N0") $</p>
     <p><strong>Condition:</strong> @Model.ProductCondition</p>
     <p><strong>Location:</strong> @Model.Location</p>
-    <p><strong>Created:</strong> @Model.CreatedAt?.ToString("dd MMMM yyyy")</p>
+    <p><strong>Created:</strong> @Model.CreatedAt?.ToString("dd.MM.yyyy")</p>
 
     <a href="/products">Back to Products</a>
 </div>

@@ -24,7 +24,10 @@ namespace Application.Services
             var product = await _repository.GetProductWithImagesAsync(id);
             if (product != null && product.Images != null)
             {
-                product.Images = product.Images.Where(img => File.Exists(GetImagePhysicalPath(img.ImagePath))).ToList();
+                product.Images = product.Images
+                    .Where(img => File.Exists(GetImagePhysicalPath(img.ImagePath)))
+                    .OrderBy(img => img.SortOrder) // <- Сортировка здесь!
+                    .ToList();
             }
             return product;
         }

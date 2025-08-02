@@ -27,9 +27,10 @@
             <div class="photo-grid" id="photoGrid">
                 @if (Model.Images != null && Model.Images.Any())
                 {
-                    @foreach (var image in Model.Images)
+                    @foreach (var image in Model.Images.OrderBy(i => i.SortOrder))
                     {
                         <div class="photo-item" data-image-id="@image.Id">
+                            <span class="photo-order">@image.SortOrder</span>
                             <img src="@image.ImagePath" alt="Product photo" />
                             <div class="delete-photo-btn" title="Delete photo">🗙</div>
                         </div>

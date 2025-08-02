@@ -15,7 +15,10 @@
                 <div class="div-image">
                     @if (product.Images?.Count > 0)
                     {
-                        <img class="product-img" src="@product.Images.First().ImagePath" alt="product" />
+                        <!-- Выбираем фото с минимальным SortOrder -->
+                        <img class="product-img"
+                             src="@product.Images.OrderBy(img => img.SortOrder).First().ImagePath"
+                             alt="product" />
                     }
                     else
                     {
@@ -27,7 +30,7 @@
                 <div class="product-info">
                     <h3 class="product-title">@product.Title</h3>
                     <p class="product-condition">@product.ProductCondition</p>
-                    <p class="product-location">@product.Location — @product.CreatedAt?.ToString("dd MMMM yyyy")</p>
+                    <p class="product-location">@product.Location — @product.CreatedAt?.ToString("dd.MM.yyyy")</p>
                 </div>
                 <div class="product-price">@product.ProductPrice?.ToString("N0") $</div>
 

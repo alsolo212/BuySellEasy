@@ -19,5 +19,12 @@ namespace Infrastructure.Repository
                 .Where(img => img.ProductId == productId)
                 .ToListAsync();
         }
+
+        public async Task<int> GetMaxSortOrderAsync(Guid productId)
+        {
+            return await _dbSet
+                .Where(img => img.ProductId == productId)
+                .MaxAsync(img => (int?)img.SortOrder) ?? 0;
+        }
     }
 }

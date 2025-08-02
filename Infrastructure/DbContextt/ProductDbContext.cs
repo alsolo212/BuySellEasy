@@ -26,24 +26,6 @@ namespace Infrastructure.DbContextt
                 .HasForeignKey(i => i.ProductId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            //seed to Products
-            string productsJson = System.IO.File.ReadAllText("products.json");
-            List<Product>? products = System.Text.Json.JsonSerializer.Deserialize<List<Product>>(productsJson);
-
-            if (products != null)
-            {
-                modelBuilder.Entity<Product>().HasData(products);
-            }
-
-            //seed to ProductImages
-            string productImagesJson = System.IO.File.ReadAllText("productImages.json");
-            List<ProductImage>? productImages = System.Text.Json.JsonSerializer.Deserialize<List<ProductImage>>(productImagesJson);
-
-            if (productImages != null)
-            {
-                modelBuilder.Entity<ProductImage>().HasData(productImages);
-            }
-
             //seed to Categories
             string categoriesJson = System.IO.File.ReadAllText("categories.json");
             List<Category>? categories = System.Text.Json.JsonSerializer.Deserialize<List<Category>>(categoriesJson);

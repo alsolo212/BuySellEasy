@@ -9,6 +9,7 @@ namespace Domain.Entities
         [Key]
         public Guid Id { get; set; } = Guid.NewGuid();
         public string ImagePath { get; set; } = string.Empty;
+        public int SortOrder { get; set; }
 
         [ForeignKey(nameof(Product))]
         public Guid ProductId { get; set; }

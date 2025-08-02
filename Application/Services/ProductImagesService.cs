@@ -30,6 +30,10 @@ namespace Application.Services
             if (productImage.Id == Guid.Empty)
                 productImage.Id = Guid.NewGuid();
 
+            // Получаем текущий максимум SortOrder и добавляем +1
+            int maxSortOrder = await _repository.GetMaxSortOrderAsync(productImage.ProductId);
+            productImage.SortOrder = maxSortOrder + 1;
+
             await _repository.AddAsync(productImage);
             await _repository.SaveAsync();
         }
