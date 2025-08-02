@@ -3,30 +3,45 @@
     ViewData["Title"] = "Product Details";
 }
 
-<div class="product-details">
-    <h2>@Model.Title</h2>
+<div class="product-details-container">
+    <!-- Блок с фото (левая колонка) -->
+    <div class="gallery-section">
+        @if (Model.Images != null && Model.Images.Any())
+        {
+            <div class="thumbnail-column">
+                @foreach (var img in Model.Images.OrderBy(i => i.SortOrder))
+                {
+                    <div class="thumbnail-item" data-target="@img.ImagePath">
+                        <img src="@img.ImagePath" alt="Thumbnail" />
+                    </div>
+                }
+            </div>
 
-    @if (Model.Images != null && Model.Images.Any())
-    {
-        <div class="product-gallery" style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px;">
-            @foreach (var img in Model.Images.OrderBy(img => img.SortOrder))
-            {
-                <img src="@img.ImagePath" alt="Product Image" style="width:200px;" />
-            }
-        </div>
-    }
-    else
-    {
-        <div style="width:200px; height:150px; background:#eee; display:flex; align-items:center; justify-content:center; margin-bottom:20px;">
-            <span>No images available</span>
-        </div>
-    }
+            <div class="main-image-container">
+                <button class="nav-arrow left prev">❮</button>
+                <img id="mainProductImage"
+                     src="@Model.Images.OrderBy(i => i.SortOrder).FirstOrDefault()?.ImagePath"
+                     alt="Main Image" />
+                <button class="nav-arrow right next">❯</button>
+            </div>
+        }
+        else
+        {
+            <div class="main-image-container">
+                <span>No images available</span>
+            </div>
+        }
+    </div>
 
-    <p><strong>Description:</strong> @Model.Description</p>
-    <p><strong>Price:</strong> @Model.ProductPrice?.ToString("N0") $</p>
-    <p><strong>Condition:</strong> @Model.ProductCondition</p>
-    <p><strong>Location:</strong> @Model.Location</p>
-    <p><strong>Created:</strong> @Model.CreatedAt?.ToString("dd.MM.yyyy")</p>
+    <!-- Блок с информацией (правая колонка) -->
+    <div class="info-section">
+        <h2>@Model.Title</h2>
+        <p><strong>Description:</strong> @Model.Description</p>
+        <p><strong>Price:</strong> @Model.ProductPrice?.ToString("N0") $</p>
+        <p><strong>Condition:</strong> @Model.ProductCondition</p>
+        <p><strong>Location:</strong> @Model.Location</p>
+        <p><strong>Created:</strong> @Model.CreatedAt?.ToString("dd.MM.yyyy")</p>
 
-    <a href="/products">Back to Products</a>
+        <a href="/products">Back to Products</a>
+    </div>
 </div>

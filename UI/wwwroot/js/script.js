@@ -134,3 +134,37 @@
         });
     }
 });
+/*..........      ...........     ........... */
+
+
+document.addEventListener('DOMContentLoaded', function () {
+    const thumbnails = document.querySelectorAll('.thumbnail-item');
+    const mainImage = document.getElementById('mainProductImage');
+    const prevBtn = document.querySelector('.prev');
+    const nextBtn = document.querySelector('.next');
+
+    let currentIndex = 0;
+    const images = Array.from(thumbnails).map(t => t.dataset.target);
+
+    thumbnails.forEach((thumb, index) => {
+        thumb.addEventListener('click', () => {
+            mainImage.src = thumb.dataset.target;
+            currentIndex = index;
+        });
+    });
+
+    prevBtn?.addEventListener('click', () => {
+        currentIndex = (currentIndex - 1 + images.length) % images.length;
+        mainImage.src = images[currentIndex];
+    });
+
+    nextBtn?.addEventListener('click', () => {
+        currentIndex = (currentIndex + 1) % images.length;
+        mainImage.src = images[currentIndex];
+    });
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowLeft') prevBtn?.click();
+        if (e.key === 'ArrowRight') nextBtn?.click();
+    });
+});
