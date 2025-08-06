@@ -85,7 +85,7 @@ th {
         font-weight: 500;
         color: #333;
         padding: 8px 12px;
-        border-radius: 4px;
+        border-radius: 8px;
         transition: background-color 0.2s ease-in-out;
     }
 
@@ -646,4 +646,74 @@ select {
     .info-section {
         margin-top: 20px;
     }
+}
+
+/*FILTERS*/
+.filters-container {
+    position: relative;
+    margin-bottom: 20px;
+    max-height: 42px;
+}
+
+.search-form {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+}
+
+.search-btn,
+.filter-toggle,
+.sort-toggle {
+    flex-shrink: 0;
+    width: 42px;
+    margin-top: 10px;
+    height: 42px;
+    padding: 0;
+    background-color: #fff;
+    border: none;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background-color 0.2s ease-in-out;
+}
+
+    .search-btn:hover,
+    .filter-toggle:hover,
+    .sort-toggle:hover {
+        background-color: #f0f0f0;
+    }
+
+    .search-btn img,
+    .filter-toggle img,
+    .sort-toggle img {
+        width: 20px;
+        height: 20px;
+        filter: brightness(0); /* делает иконку чёрной */
+    }
+
+/* Выпадающие меню */
+.dropdown-menu {
+    position: absolute;
+    top: 50px;
+    right: 0;
+    width: 240px;
+    padding: 20px;
+    background-color: #ffffff;
+    border: 1px solid #ccc;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+    display: none;
+    flex-direction: column;
+    gap: 12px;
+    z-index: 100;
+}
+
+/* Используем big-btn вместо apply-btn */
+.dropdown-menu .big-btn {
+    font-size: 14px;
+    padding: 10px;
 }

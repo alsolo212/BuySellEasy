@@ -1,6 +1,8 @@
-﻿using Application.ServiceContracts;
+﻿using Application.DTO.FiltersDto;
+using Application.ServiceContracts;
 using Domain.Entities;
 using Microsoft.AspNetCore.Mvc;
+using UI.Filters;
 
 namespace BSE.Controllers
 {
@@ -16,9 +18,9 @@ namespace BSE.Controllers
         }
 
         [Route("products")]
-        public async Task<IActionResult> Products()
+        public async Task<IActionResult> Products([FromQuery] ProductFilterDto filters)
         {
-            var products = await _productService.GetProducts();
+            var products = await _productService.GetProducts(filters);
             return View(products);
         }
 

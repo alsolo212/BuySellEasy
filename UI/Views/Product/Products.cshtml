@@ -1,9 +1,48 @@
-﻿@model List<Domain.Entities.Product>
+﻿@using Application.DTO.FiltersDto;
+@model List<Domain.Entities.Product>
 @{
     ViewData["Title"] = "Products";
 }
 
 <div class="page-content">
+    <div class="filters-container">
+        <form method="get" asp-controller="Product" asp-action="Index" class="search-form">
+            <input type="text" name="SearchTerm" placeholder="Search by title" value="@Context.Request.Query["SearchTerm"]"/>
+            <button type="submit" class="search-btn">
+                <img src="https://www.svgrepo.com/show/345108/search.svg" alt="Search" />
+            </button>
+            <button type="button" class="sort-toggle">
+                <img src="https://www.svgrepo.com/download/378521/arrow-up-down.svg" alt="Sort" />
+            </button>
+            <button type="button" class="filter-toggle">
+                <img src="https://www.svgrepo.com/show/422522/filter-filters.svg" alt="Filter" />
+            </button>
+
+            <div class="dropdown-menu">
+                <label>Condition:</label>
+                <select name="Condition">
+                    <option value="">Any</option>
+                    <option value="New">New</option>
+                    <option value="Used">Used</option>
+                </select>
+
+                <label>Price Range:</label>
+                <input type="text" name="MinPrice" placeholder="Min" value="@Context.Request.Query["MinPrice"]" />
+                <input type="text" name="MaxPrice" placeholder="Max" value="@Context.Request.Query["MaxPrice"]" />
+
+                <button type="submit" class="big-btn">Apply Filters</button>
+            </div>
+
+            <div class="dropdown-menu">
+                <label><input type="radio" name="SortBy" value="recommended" @(Context.Request.Query["SortBy"] == "recommended" ? "checked" : "") /> Recommended</label>
+                <label><input type="radio" name="SortBy" value="newest" @(Context.Request.Query["SortBy"] == "newest" ? "checked" : "") /> The Newest</label>
+                <label><input type="radio" name="SortBy" value="cheapest" @(Context.Request.Query["SortBy"] == "cheapest" ? "checked" : "") /> The Cheapest</label>
+                <label><input type="radio" name="SortBy" value="expensive" @(Context.Request.Query["SortBy"] == "expensive" ? "checked" : "") /> The Most Expensive</label>
+
+                <button type="submit" class="big-btn">Apply Sort</button>
+            </div>
+        </form>
+    </div>
     <h1>Products</h1>
 
     <a class="btn add-btn" href="/product/create">Add Product</a>

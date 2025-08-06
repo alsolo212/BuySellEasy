@@ -1,4 +1,5 @@
-﻿using Application.ServiceContracts;
+﻿using Application.DTO.FiltersDto;
+using Application.ServiceContracts;
 using Domain.Entities;
 using Domain.RepositoryContracts;
 
@@ -13,10 +14,47 @@ namespace Application.Services
             _repository = repository;
         }
 
-        public async Task<List<Product>> GetProducts()
+        public async Task<List<Product>> GetProducts(ProductFilterDto filter)
         {
             var products = await _repository.GetAllWithImagesAsync();
-            return products?.ToList() ?? new List<Product>();
+            if (products == null)
+                return new List<Product>();
+
+            var query = products.AsQueryable();
+
+            // Поиск
+            if (!string.IsNullOrWhiteSpace(filter.SearchTerm))
+                query = query.Where(p => p.Title != null &&
+                                         p.Title.ToLower().Contains(filter.SearchTerm.ToLower()));
+
+            // Фильтрация
+            if (!string.IsNullOrEmpty(filter.Condition))
+                query = query.Where(p => p.ProductCondition == filter.Condition);
+
+            if (filter.MinPrice.HasValue)
+                query = query.Where(p => p.ProductPrice >= filter.MinPrice.Value);
+
+            if (filter.MaxPrice.HasValue)
+                query = query.Where(p => p.ProductPrice <= filter.MaxPrice.Value);
+
+            // Сортировка
+            switch (filter.SortBy.ToLower())
+            {
+                case "newest":
+                    query = query.OrderByDescending(p => p.CreatedAt);
+                    break;
+                case "cheapest":
+                    query = query.OrderBy(p => p.ProductPrice);
+                    break;
+                case "expensive":
+                    query = query.OrderByDescending(p => p.ProductPrice);
+                    break;
+                default: // recommended
+                    query = query.OrderBy(p => p.Title); // или без сортировки
+                    break;
+            }
+
+            return query.ToList();
         }
 
         public async Task<Product?> GetProductById(Guid id)

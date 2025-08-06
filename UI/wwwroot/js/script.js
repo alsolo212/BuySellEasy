@@ -168,3 +168,37 @@ document.addEventListener('DOMContentLoaded', function () {
         if (e.key === 'ArrowRight') nextBtn?.click();
     });
 });
+
+/*FILTERS*/
+document.addEventListener("DOMContentLoaded", () => {
+    // Общая функция для работы с выпадающими меню
+    const initDropdown = (toggleClass, menuClass) => {
+        const toggle = document.querySelector(`.${toggleClass}`);
+        const menu = document.querySelector(`.${menuClass}`);
+
+        if (!toggle || !menu) return;
+
+        toggle.addEventListener("click", (e) => {
+            e.stopPropagation();
+            const isVisible = menu.style.display === "flex";
+            closeAllMenus();
+            menu.style.display = isVisible ? "none" : "flex";
+        });
+
+        menu.addEventListener("click", e => e.stopPropagation());
+    };
+
+    // Закрыть все меню
+    const closeAllMenus = () => {
+        document.querySelectorAll('.dropdown-menu').forEach(menu => {
+            menu.style.display = "none";
+        });
+    };
+
+    // Инициализация всех меню
+    initDropdown('filter-toggle', 'dropdown-menu:first-of-type');
+    initDropdown('sort-toggle', 'dropdown-menu:last-of-type');
+
+    // Закрытие при клике вне меню
+    document.addEventListener("click", closeAllMenus);
+});
