@@ -23,9 +23,34 @@
     <div class="page-content">
         @RenderBody()
     </div>
-    <div class="footer-content">
-        @RenderSection("footer_section", false)
-    </div>
+    <footer class="footer">
+        <div class="footer-container">
+            <div class="footer-logo">
+                <h2>BSE</h2>
+                <p>Your trusted marketplace for buying and selling products.</p>
+            </div>
+
+            <div class="footer-links">
+                <h4>Quick Links</h4>
+                <ul>
+                    <li><a href="/products">Products</a></li>
+                    <li><a href="/cart">Cart</a></li>
+                    <li><a href="/profile">Profile</a></li>
+                    <li><a href="/contact">Contact Us</a></li>
+                </ul>
+            </div>
+
+            <div class="footer-contact">
+                <h4>Contact</h4>
+                <p>Email: support@bse.com</p>
+                <p>Telegram: alsolo212</p>
+            </div>
+        </div>
+
+        <div class="footer-bottom">
+            <p>© 2025 BSE. All rights reserved.</p>
+        </div>
+    </footer>
     @RenderSection("additonalScripts", false)
 </body>
 </html>
