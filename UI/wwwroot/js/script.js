@@ -171,7 +171,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
 /*FILTERS*/
 document.addEventListener("DOMContentLoaded", () => {
-    // Общая функция для работы с выпадающими меню
+    // 1. Инициализация выпадающих меню
     const initDropdown = (toggleClass, menuClass) => {
         const toggle = document.querySelector(`.${toggleClass}`);
         const menu = document.querySelector(`.${menuClass}`);
@@ -188,17 +188,104 @@ document.addEventListener("DOMContentLoaded", () => {
         menu.addEventListener("click", e => e.stopPropagation());
     };
 
-    // Закрыть все меню
     const closeAllMenus = () => {
         document.querySelectorAll('.dropdown-menu').forEach(menu => {
             menu.style.display = "none";
         });
     };
 
-    // Инициализация всех меню
     initDropdown('filter-toggle', 'dropdown-menu:first-of-type');
     initDropdown('sort-toggle', 'dropdown-menu:last-of-type');
-
-    // Закрытие при клике вне меню
     document.addEventListener("click", closeAllMenus);
+
+    // 2. Работа с фильтрами
+    const form = document.querySelector('.search-form');
+    const searchInput = document.querySelector('[name="SearchTerm"]');
+    const conditionInput = document.querySelector('[name="Condition"]');
+    const minPriceInput = document.querySelector('[name="MinPrice"]');
+    const maxPriceInput = document.querySelector('[name="MaxPrice"]');
+    const sortByRadios = document.querySelectorAll('[name="SortBy"]');
+
+    // Проверяем, нужно ли применить фильтры при загрузке
+    let shouldApplyFilters = true;
+    if (sessionStorage.getItem('filtersApplied')) {
+        shouldApplyFilters = false;
+    } else {
+        sessionStorage.setItem('filtersApplied', 'true');
+    }
+
+    // Функция сохранения фильтров
+    const saveFilters = () => {
+        const filters = {
+            searchTerm: searchInput.value,
+            condition: conditionInput.value,
+            minPrice: minPriceInput.value,
+            maxPrice: maxPriceInput.value,
+            sortBy: document.querySelector('[name="SortBy"]:checked')?.value || 'recommended'
+        };
+        sessionStorage.setItem('productFilters', JSON.stringify(filters));
+    };
+
+    // Восстановление фильтров
+    const restoreFilters = () => {
+        const savedFilters = sessionStorage.getItem('productFilters');
+        if (savedFilters) {
+            const filters = JSON.parse(savedFilters);
+
+            searchInput.value = filters.searchTerm || '';
+            conditionInput.value = filters.condition || '';
+            minPriceInput.value = filters.minPrice || '';
+            maxPriceInput.value = filters.maxPrice || '';
+
+            sortByRadios.forEach(radio => {
+                radio.checked = radio.value === (filters.sortBy || 'recommended');
+            });
+
+            // Применяем фильтры только при первом заходе
+            if (shouldApplyFilters && (filters.condition || filters.minPrice || filters.maxPrice || filters.sortBy !== 'recommended')) {
+                setTimeout(() => form.submit(), 100);
+            }
+        }
+    };
+
+    // Обработчики событий
+    const filterInputs = [conditionInput, minPriceInput, maxPriceInput, ...sortByRadios];
+    filterInputs.forEach(input => {
+        input.addEventListener('change', saveFilters);
+    });
+
+    searchInput.addEventListener('input', () => {
+        // Сохраняем поисковый запрос, но не применяем автоматически
+        const filters = JSON.parse(sessionStorage.getItem('productFilters') || '{}');
+        filters.searchTerm = searchInput.value;
+        sessionStorage.setItem('productFilters', JSON.stringify(filters));
+    });
+
+    form.addEventListener('submit', function (e) {
+        saveFilters();
+    });
+
+    // Кнопка сброса фильтров
+    document.getElementById('resetFilters')?.addEventListener('click', (e) => {
+        e.preventDefault();
+
+        // Сбрасываем только фильтры (кроме поиска)
+        conditionInput.value = '';
+        minPriceInput.value = '';
+        maxPriceInput.value = '';
+        document.querySelector('[name="SortBy"][value="recommended"]').checked = true;
+
+        // Сохраняем текущий поисковый запрос
+        const currentSearch = searchInput.value;
+        saveFilters();
+        searchInput.value = currentSearch;
+
+        // Отправляем форму
+        form.submit();
+    });
+
+    // Восстанавливаем фильтры при загрузке
+    restoreFilters();
+
+    
 });

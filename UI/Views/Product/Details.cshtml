@@ -41,7 +41,7 @@
         <p><strong>Condition:</strong> @Model.ProductCondition</p>
         <p><strong>Location:</strong> @Model.Location</p>
         <p><strong>Created:</strong> @Model.CreatedAt?.ToString("dd.MM.yyyy")</p>
-
-        <a href="/products">Back to Products</a>
+        
+        <a href="@Context.GetCallBackUrl("/products")">Back to Products</a>
     </div>
 </div>

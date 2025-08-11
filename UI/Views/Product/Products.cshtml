@@ -6,8 +6,8 @@
 
 <div class="page-content">
     <div class="filters-container">
-        <form method="get" asp-controller="Product" asp-action="Index" class="search-form">
-            <input type="text" name="SearchTerm" placeholder="Search by title" value="@Context.Request.Query["SearchTerm"]"/>
+        <form method="get" asp-controller="Product" asp-action="Products" class="search-form" id="filterForm">
+            <input type="text" name="SearchTerm" placeholder="Search by title" />
             <button type="submit" class="search-btn">
                 <img src="https://www.svgrepo.com/show/345108/search.svg" alt="Search" />
             </button>
@@ -27,17 +27,18 @@
                 </select>
 
                 <label>Price Range:</label>
-                <input type="text" name="MinPrice" placeholder="Min" value="@Context.Request.Query["MinPrice"]" />
-                <input type="text" name="MaxPrice" placeholder="Max" value="@Context.Request.Query["MaxPrice"]" />
+                <input type="text" name="MinPrice" placeholder="Min" />
+                <input type="text" name="MaxPrice" placeholder="Max" />
 
                 <button type="submit" class="big-btn">Apply Filters</button>
+                <button type="button" id="resetFilters" class="big-btn" style="background: gray; margin-top: 0;">Reset Filters</button>
             </div>
 
             <div class="dropdown-menu">
-                <label><input type="radio" name="SortBy" value="recommended" @(Context.Request.Query["SortBy"] == "recommended" ? "checked" : "") /> Recommended</label>
-                <label><input type="radio" name="SortBy" value="newest" @(Context.Request.Query["SortBy"] == "newest" ? "checked" : "") /> The Newest</label>
-                <label><input type="radio" name="SortBy" value="cheapest" @(Context.Request.Query["SortBy"] == "cheapest" ? "checked" : "") /> The Cheapest</label>
-                <label><input type="radio" name="SortBy" value="expensive" @(Context.Request.Query["SortBy"] == "expensive" ? "checked" : "") /> The Most Expensive</label>
+                <label><input type="radio" name="SortBy" value="recommended" checked /> Recommended</label>
+                <label><input type="radio" name="SortBy" value="newest" /> The Newest</label>
+                <label><input type="radio" name="SortBy" value="cheapest" /> The Cheapest</label>
+                <label><input type="radio" name="SortBy" value="expensive" /> The Most Expensive</label>
 
                 <button type="submit" class="big-btn">Apply Sort</button>
             </div>
@@ -54,7 +55,6 @@
                 <div class="div-image">
                     @if (product.Images?.Count > 0)
                     {
-                        <!-- Выбираем фото с минимальным SortOrder -->
                         <img class="product-img"
                              src="@product.Images.OrderBy(img => img.SortOrder).First().ImagePath"
                              alt="product" />
@@ -74,13 +74,13 @@
                 <div class="product-price">@product.ProductPrice?.ToString("N0") $</div>
 
                 <div class="product-actions">
-                    <a href="/product/edit/@product.Id" class="edit-btn">Edit</a>
-                    <form asp-action="Delete" asp-controller="Product" asp-route-id="@product.Id" method="post" style="display:inline;">
+                    <a href="/product/edit/@product.Id?" class="edit-btn">Edit</a>
+                    <form asp-action="Delete" asp-controller="Product" asp-route-id="@product.Id" method="post"
+                          style="display:inline;">
                         <button class="delete-btn" type="submit">Delete</button>
                     </form>
                 </div>
             </div>
-
         }
     </div>
 
