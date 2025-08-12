@@ -5,16 +5,21 @@
 }
 <div class="page-content">
     <h1>Categories</h1>
-    <ul>
-        <li><a href="/categories">All categories</a></li>
+    <div class="categories-container">
         @foreach (var category in Model)
         {
-            <li>@category.Name</li>
+            <a class="category-card" href="@Url.Action("Products", "Product", new { categoryId = category.Id })">
+                <div class="category-image">
+                    <img src="@category.ImageUrl" alt="@category.Name" />
+                    <div class="overlay">Смотреть товары</div>
+                </div>
+                <div class="category-name">@category.Name</div>
+            </a>
         }
-    </ul>
+    </div>
     
     <h1>Products</h1>
     <div>
             <a href="/products">Products</a>
-        </div>
     </div>
+</div>

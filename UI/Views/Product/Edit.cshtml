@@ -64,6 +64,12 @@
         <!-- Основные поля продукта -->
             <input asp-for="Title" placeholder="Title" required />
             <br />
+            <div class="form-group">
+                <select asp-for="CategoryId" class="form-control" asp-items="@(new SelectList(ViewBag.Categories, "Id", "Name"))">
+                    <option value="">Select Category</option>
+                </select>
+                <span asp-validation-for="CategoryId" class="text-danger"></span>
+            </div>
             <input asp-for="Description" placeholder="Description" required />
             <br />
             <select asp-for="ProductCondition" required>

@@ -1,7 +1,6 @@
 ﻿using Application.ServiceContracts;
 using Domain.Entities;
 using Domain.RepositoryContracts;
-using static System.Net.Mime.MediaTypeNames;
 
 namespace Application.Services
 {

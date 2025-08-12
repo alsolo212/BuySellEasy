@@ -26,6 +26,13 @@ namespace Infrastructure.DbContextt
                 .HasForeignKey(i => i.ProductId)
                 .OnDelete(DeleteBehavior.Cascade);
 
+            // One category - many products
+            modelBuilder.Entity<Category>()
+                .HasMany(c => c.Products)
+                .WithOne(p => p.Category)
+                .HasForeignKey(p => p.CategoryId)
+                .OnDelete(DeleteBehavior.Restrict);
+
             //seed to Categories
             string categoriesJson = System.IO.File.ReadAllText("categories.json");
             List<Category>? categories = System.Text.Json.JsonSerializer.Deserialize<List<Category>>(categoriesJson);

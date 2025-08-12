@@ -87,6 +87,7 @@ namespace Application.Services
             if (existing != null)
             {
                 existing.Title = product.Title;
+                existing.CategoryId = product.CategoryId;
                 existing.Description = product.Description;
                 existing.ProductPrice = product.ProductPrice;
                 existing.Location = product.Location;

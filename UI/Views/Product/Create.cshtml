@@ -30,6 +30,12 @@
         </div>
         <input type="text" name="Title" placeholder="Title" required />
         <br />
+        <div class="form-group">
+            <select asp-for="CategoryId" class="form-control" asp-items="@(new SelectList(ViewBag.Categories, "Id", "Name"))">
+                <option value="">Select Category</option>
+            </select>
+            <span asp-validation-for="CategoryId" class="text-danger"></span>
+        </div>
         <input type="text" name="Description" placeholder="Description" required />
         <br />
         <select name="ProductCondition" required>

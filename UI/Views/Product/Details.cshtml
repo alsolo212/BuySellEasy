@@ -36,9 +36,10 @@
     <!-- Блок с информацией (правая колонка) -->
     <div class="info-section">
         <h2>@Model.Title</h2>
+        <p class ="product-condition">@Model.ProductCondition</p>
+        <p class="product-condition">@Model.Category?.Name</p>
         <p><strong>Description:</strong> @Model.Description</p>
         <p><strong>Price:</strong> @Model.ProductPrice?.ToString("N0") $</p>
-        <p><strong>Condition:</strong> @Model.ProductCondition</p>
         <p><strong>Location:</strong> @Model.Location</p>
         <p><strong>Created:</strong> @Model.CreatedAt?.ToString("dd.MM.yyyy")</p>
         

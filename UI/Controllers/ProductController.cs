@@ -10,11 +10,13 @@ namespace BSE.Controllers
     {
         private readonly IProductService _productService;
         private readonly IProductImageService _productImageService;
+        private readonly ICategoriesService _categoriesService;
 
-        public ProductController(IProductService productService, IProductImageService productImageService)
+        public ProductController(IProductService productService, IProductImageService productImageService, ICategoriesService categoriesService)
         {
             _productService = productService;
             _productImageService = productImageService;
+            _categoriesService = categoriesService;
         }
 
         [Route("products")]
@@ -37,8 +39,9 @@ namespace BSE.Controllers
 
         [HttpGet]
         [Route("product/create")]
-        public IActionResult Create()
+        public async Task<IActionResult> Create()
         {
+            ViewBag.Categories = await _categoriesService.GetCategories();
             return View();
         }
 
@@ -49,6 +52,7 @@ namespace BSE.Controllers
             if (!ModelState.IsValid)
             {
                 ViewBag.CreateError = "Invalid input.";
+                ViewBag.Categories = await _categoriesService.GetCategories();
                 return View(product);
             }
 
@@ -102,8 +106,10 @@ namespace BSE.Controllers
             if (product == null)
                 return NotFound();
 
+            ViewBag.Categories = await _categoriesService.GetCategories();
             return View(product);
         }
+
 
         [HttpPost]
         [Route("product/edit/{id}")]
@@ -115,6 +121,7 @@ namespace BSE.Controllers
                 product.ProductPrice <= 0)
             {
                 ViewBag.EditError = "Please fill all required fields correctly";
+                ViewBag.Categories = await _categoriesService.GetCategories();
                 return View(product);
             }
 
