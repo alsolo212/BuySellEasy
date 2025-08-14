@@ -1,5 +1,5 @@
 ﻿@using Application.DTO.FiltersDto;
-@model List<Domain.Entities.Product>
+@model UI.Helpers.HomeViewModel
 @{
     ViewData["Title"] = "Products";
 }
@@ -19,6 +19,16 @@
             </button>
 
             <div class="dropdown-menu">
+                <label>Category:</label>
+                <select name="CategoryId">
+                    <option value="">All categories</option>
+                    @foreach (var category in Model.Categories)
+                    {
+                        <option value="@category.Id" selected="@(Context.Request.Query["CategoryId"] == category.Id.ToString())">
+                            @category.Name
+                        </option>
+                    }
+                </select>
                 <label>Condition:</label>
                 <select name="Condition">
                     <option value="">Any</option>
@@ -49,7 +59,7 @@
     <a class="btn add-btn" href="/product/create">Add Product</a>
 
     <div class="product-grid">
-        @foreach (var product in Model)
+        @foreach (var product in Model.Products)
         {
             <div class="product-card" onclick="location.href='/product/details/@product.Id'" style="cursor: pointer;">
                 <div class="div-image">

@@ -732,6 +732,7 @@ select {
     }
 
     .info-section {
+        max-width: 680px;
         margin-top: 20px;
     }
 }

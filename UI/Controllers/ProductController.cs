@@ -3,6 +3,7 @@ using Application.ServiceContracts;
 using Domain.Entities;
 using Microsoft.AspNetCore.Mvc;
 using UI.Filters;
+using UI.Helpers;
 
 namespace BSE.Controllers
 {
@@ -22,8 +23,13 @@ namespace BSE.Controllers
         [Route("products")]
         public async Task<IActionResult> Products([FromQuery] ProductFilterDto filters)
         {
-            var products = await _productService.GetProducts(filters);
-            return View(products);
+            var model = new HomeViewModel
+            {
+                Categories = await _categoriesService.GetCategories(),
+                Products = await _productService.GetProducts(filters)
+            };
+
+            return View(model);
         }
 
         [HttpGet]

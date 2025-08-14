@@ -1,17 +1,17 @@
-﻿@model List<Domain.Entities.Category>
-
+﻿@model UI.Helpers.HomeViewModel
 @{
     ViewData["Title"] = "Buy sell easy";
 }
 <div class="page-content">
     <h1>Categories</h1>
     <div class="categories-container">
-        @foreach (var category in Model)
+        @foreach (var category in Model.Categories)
         {
-            <a class="category-card" href="@Url.Action("Products", "Product", new { categoryId = category.Id })">
+            <a class="category-card"
+               href="@Url.Action("Products", "Product", new { CategoryId = category.Id })">
                 <div class="category-image">
                     <img src="@category.ImageUrl" alt="@category.Name" />
-                    <div class="overlay">Смотреть товары</div>
+                    <div class="overlay">View products</div>
                 </div>
                 <div class="category-name">@category.Name</div>
             </a>
@@ -19,7 +19,31 @@
     </div>
     
     <h1>Products</h1>
-    <div>
-            <a href="/products">Products</a>
+    <div class="product-grid">
+        @foreach (var product in Model.Products)
+        {
+            <div class="product-card" onclick="location.href='/product/details/@product.Id'" style="cursor: pointer;">
+                <div class="div-image">
+                    @if (product.Images?.Count > 0)
+                    {
+                        <img class="product-img"
+                             src="@product.Images.OrderBy(img => img.SortOrder).First().ImagePath"
+                             alt="product" />
+                    }
+                    else
+                    {
+                        <div style="width:130px; height:130px; background-color:#eee; display:flex; align-items:center; justify-content:center; border-radius: 8px;">
+                            <span>No image</span>
+                        </div>
+                    }
+                </div>
+                <div class="product-info">
+                    <h3 class="product-title">@product.Title</h3>
+                    <p class="product-condition">@product.ProductCondition</p>
+                    <p class="product-location">@product.Location — @product.CreatedAt?.ToString("dd.MM.yyyy")</p>
+                </div>
+                <div class="product-price">@product.ProductPrice?.ToString("N0") $</div>
+            </div>
+        }
     </div>
 </div>

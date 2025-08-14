@@ -1,4 +1,4 @@
-﻿namespace UI.Halpers
+﻿namespace UI.Helpers
 {
     public static class ViewsHelpers
     {

@@ -1,26 +1,35 @@
-﻿using Application.ServiceContracts;
-using Domain.Entities;
+﻿using Application.DTO.FiltersDto;
+using Application.ServiceContracts;
 using Microsoft.AspNetCore.Mvc;
+using UI.Helpers;
 
 namespace BSE.Controllers
 {
     public class HomeController : Controller
     {
+        private readonly IProductService _productService;
+        private readonly IProductImageService _productImageService;
         private readonly ICategoriesService _categoriesService;
 
-        public HomeController(ICategoriesService categoriesService)
+        public HomeController(IProductService productService, IProductImageService productImageService, ICategoriesService categoriesService)
         {
+            _productService = productService;
+            _productImageService = productImageService;
             _categoriesService = categoriesService;
         }
 
         [Route("/")]
         [Route("home")]
-        public async Task<IActionResult> Index()
+        public async Task<IActionResult> Index([FromQuery] ProductFilterDto filters)
         {
-            var categories = await _categoriesService.GetCategories();
-            return View(categories);
-        }
+            var model = new HomeViewModel
+            {
+                Categories = await _categoriesService.GetCategories(),
+                Products = await _productService.GetProducts(filters)
+            };
 
+            return View(model);
+        }
 
         [Route("categories")]
         public IActionResult Categories()

@@ -28,6 +28,9 @@ namespace Application.Services
                                          p.Title.ToLower().Contains(filter.SearchTerm.ToLower()));
 
             // Фильтрация
+            if (filter.CategoryId.HasValue)
+                query = query.Where(p => p.CategoryId == filter.CategoryId);
+
             if (!string.IsNullOrEmpty(filter.Condition))
                 query = query.Where(p => p.ProductCondition == filter.Condition);
 
