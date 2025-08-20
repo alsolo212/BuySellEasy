@@ -1,0 +1,33 @@
+﻿@model List<Domain.IdentityEntities.User>
+
+@{
+    ViewData["Title"] = "All Users";
+}
+
+<div class="page-content">
+    <h1>Users:</h1>
+
+    <div class="user-grid">
+        @foreach (var user in Model)
+        {
+            <div class="user-card">
+                <div class="user-avatar"></div>
+
+                <div class="user-info">
+                    <p class="user-name">@user.UserName</p>
+                    <p class="user-email">@user.Email</p>
+                </div>
+
+                <div class="user-actions">
+                    <a href="/Account/Edit/@user.Id" class="edit-btn">Edit</a>
+
+                    <form asp-action="Delete" asp-controller="Account" asp-route-id="@user.Id" method="post">
+                        <button class="delete-btn" type="submit">Delete</button>
+                    </form>
+                </div>
+            </div>
+        }
+    </div>
+
+    <h1>Admins:</h1>
+</div>

@@ -1,7 +1,6 @@
 ﻿using Application.DTO.FiltersDto;
 using Application.DTO.IdentityDto;
 using Application.ServiceContracts;
-using Application.Services;
 using Domain.IdentityEntities;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -110,13 +109,38 @@ namespace UI.Controllers
             return View(model);
         }
 
-
-
         [HttpPost]
         public async Task<IActionResult> Logout()
         {
             await _signInManager.SignOutAsync();
             return RedirectToAction("Auth");
+        }
+
+        [Route("users")]
+        public IActionResult Users()
+        {
+            var users = _userManager.Users.ToList();
+            return View(users);
+        }
+
+        [Route("edituser")]
+        public async Task<IActionResult> Edit(string id)
+        {
+            var user = await _userManager.FindByIdAsync(id);
+            if (user == null) return NotFound();
+
+            return View(user);
+        }
+
+        // POST: /Account/Delete/{id}
+        [HttpPost]
+        public async Task<IActionResult> Delete(string id)
+        {
+            var user = await _userManager.FindByIdAsync(id);
+            if (user == null) return NotFound();
+
+            await _userManager.DeleteAsync(user);
+            return RedirectToAction("Users");
         }
     }
 }
