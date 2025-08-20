@@ -1,0 +1,98 @@
+﻿@{
+    ViewData["Title"] = "Profile";
+}
+@model UI.Helpers.HomeViewModel
+<h1>Welcome, @User.Identity?.Name!</h1>
+
+<form asp-action="Logout" asp-controller="Account" method="post">
+    <button style="background: red" type="submit">Logout</button>
+</form>
+
+<div class="filters-container">
+    <form method="get" asp-controller="Account" asp-action="Profile" class="search-form" id="filterForm">
+        <input type="text" name="SearchTerm" placeholder="Search by title" />
+        <button type="submit" class="search-btn">
+            <img src="https://www.svgrepo.com/show/345108/search.svg" alt="Search" />
+        </button>
+        <button type="button" class="sort-toggle">
+            <img src="https://www.svgrepo.com/download/378521/arrow-up-down.svg" alt="Sort" />
+        </button>
+        <button type="button" class="filter-toggle">
+            <img src="https://www.svgrepo.com/show/422522/filter-filters.svg" alt="Filter" />
+        </button>
+
+        <div class="dropdown-menu">
+            <label>Category:</label>
+            <select name="CategoryId">
+                <option value="">All categories</option>
+                @foreach (var category in Model.Categories)
+                {
+                    <option value="@category.Id" selected="@(Context.Request.Query["CategoryId"] == category.Id.ToString())">
+                        @category.Name
+                    </option>
+                }
+            </select>
+            <label>Condition:</label>
+            <select name="Condition">
+                <option value="">Any</option>
+                <option value="New">New</option>
+                <option value="Used">Used</option>
+            </select>
+
+            <label>Price Range:</label>
+            <input type="text" name="MinPrice" placeholder="Min" />
+            <input type="text" name="MaxPrice" placeholder="Max" />
+
+            <button type="submit" class="big-btn">Apply Filters</button>
+            <button type="button" id="resetFilters" class="big-btn" style="background: gray; margin-top: 0;">Reset Filters</button>
+        </div>
+
+        <div class="dropdown-menu">
+            <label><input type="radio" name="SortBy" value="recommended" checked /> Recommended</label>
+            <label><input type="radio" name="SortBy" value="newest" /> The Newest</label>
+            <label><input type="radio" name="SortBy" value="cheapest" /> The Cheapest</label>
+            <label><input type="radio" name="SortBy" value="expensive" /> The Most Expensive</label>
+
+            <button type="submit" class="big-btn">Apply Sort</button>
+        </div>
+    </form>
+</div>
+<h2>Your products:</h2>
+
+<a class="btn add-btn" href="/product/create">Add Product</a>
+
+<div class="product-grid">
+    @foreach (var product in Model.Products)
+    {
+        <div class="product-card" onclick="location.href='/product/details/@product.Id'" style="cursor: pointer;">
+            <div class="div-image">
+                @if (product.Images?.Count > 0)
+                {
+                    <img class="product-img"
+                         src="@product.Images.OrderBy(img => img.SortOrder).First().ImagePath"
+                         alt="product" />
+                }
+                else
+                {
+                    <div style="width:130px; height:130px; background-color:#eee; display:flex; align-items:center; justify-content:center; border-radius: 8px;">
+                        <span>No image</span>
+                    </div>
+                }
+            </div>
+            <div class="product-info">
+                <h3 class="product-title">@product.Title</h3>
+                <p class="product-condition">@product.ProductCondition</p>
+                <p class="product-location">@product.Location — @product.CreatedAt?.ToString("dd.MM.yyyy")</p>
+            </div>
+            <div class="product-price">@product.ProductPrice?.ToString("N0") $</div>
+
+            <div class="product-actions">
+                <a href="/product/edit/@product.Id?" class="edit-btn">Edit</a>
+                <form asp-action="Delete" asp-controller="Product" asp-route-id="@product.Id" method="post"
+                      style="display:inline;">
+                    <button class="delete-btn" type="submit">Delete</button>
+                </form>
+            </div>
+        </div>
+    }
+</div>

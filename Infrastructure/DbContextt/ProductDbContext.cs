@@ -1,9 +1,11 @@
-﻿using Microsoft.EntityFrameworkCore;
-using Domain.Entities;
+﻿using Domain.Entities;
+using Domain.IdentityEntities;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 
 namespace Infrastructure.DbContextt
 {
-    public class ProductDbContext : DbContext
+    public class ProductDbContext : IdentityDbContext<User, Role, Guid>
     {
         public ProductDbContext(DbContextOptions options) : base(options) { }
         public DbSet<Product> Products {  get; set; }
@@ -32,6 +34,14 @@ namespace Infrastructure.DbContextt
                 .WithOne(p => p.Category)
                 .HasForeignKey(p => p.CategoryId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            // One user - many products
+            modelBuilder.Entity<User>()
+                .HasMany(u => u.Products)
+                .WithOne(p => p.User)
+                .HasForeignKey(p => p.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
 
             //seed to Categories
             string categoriesJson = System.IO.File.ReadAllText("categories.json");

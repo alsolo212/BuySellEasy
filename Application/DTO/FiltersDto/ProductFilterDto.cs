@@ -8,5 +8,6 @@
         public double? MinPrice { get; set; }
         public double? MaxPrice { get; set; }
         public string SortBy { get; set; } = "recommended";
+        public Guid? UserId { get; set; }
     }
 }

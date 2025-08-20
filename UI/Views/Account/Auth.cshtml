@@ -1,0 +1,80 @@
+﻿@{
+    ViewData["Title"] = "Login / Register";
+}
+
+<div class="block-section">
+    <h2>Welcome User!</h2>
+    <p>You are not logged in. Choose an option:</p>
+
+    <button class="select-btn" onclick="showLogin()">Login</button>
+    <button class="select-btn" onclick="showRegister()">Register</button>
+
+    <!-- Login Form -->
+    <div id="loginForm" style="display:none; margin-top: 15px;">
+        <h2>Login</h2>
+        <form asp-action="Login" asp-controller="Account" method="post">
+            <input type="email" name="Email" placeholder="Email" required />
+            <br />
+            <input type="password" name="Password" placeholder="Password" required />
+            <br />
+            <button class="big-btn" type="submit">Login</button>
+        </form>
+
+        @if (TempData["LoginError"] != null)
+        {
+            <p style="color: red;">@TempData["LoginError"]</p>
+        }
+    </div>
+
+    <!-- Register Form -->
+    <div id="registerForm" style="display:none; margin-top: 15px;">
+        <h2>Register</h2>
+        <form asp-action="Register" asp-controller="Account" method="post">
+            <input type="text" name="UserName" placeholder="Nickname" required />
+            <br />
+            <input type="email" name="Email" placeholder="Email" required />
+            <br />
+            <input type="text" name="Phone" placeholder="Phone (optional)" />
+            <br />
+            <input type="password" name="Password" placeholder="Password" required />
+            <br />
+            <input type="password" name="ConfirmPassword" placeholder="Confirm Password" required />
+            <br />
+            <button class="big-btn" type="submit">Register</button>
+        </form>
+
+        @if (TempData["RegisterError"] != null)
+        {
+            <p style="color: red;">@TempData["RegisterError"]</p>
+        }
+    </div>
+
+    @if (!ViewData.ModelState.IsValid)
+    {
+        @foreach (var error in ViewData.ModelState.Values.SelectMany(v => v.Errors))
+        {
+            <p style ="color:red">@error.ErrorMessage</p>
+        }
+    }
+</div>
+
+<script>
+    function showLogin() {
+        document.getElementById("loginForm").style.display = "block";
+        document.getElementById("registerForm").style.display = "none";
+
+        document.querySelectorAll(".select-btn").forEach(btn => btn.classList.remove("active"));
+        document.querySelectorAll(".select-btn")[0].classList.add("active");
+    }
+
+    function showRegister() {
+        document.getElementById("registerForm").style.display = "block";
+        document.getElementById("loginForm").style.display = "none";
+
+        document.querySelectorAll(".select-btn").forEach(btn => btn.classList.remove("active"));
+        document.querySelectorAll(".select-btn")[1].classList.add("active");
+    }
+
+    // По умолчанию показываем Login
+    showLogin();
+</script>

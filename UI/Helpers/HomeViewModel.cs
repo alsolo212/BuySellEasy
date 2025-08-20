@@ -6,4 +6,3 @@
         public List<Domain.Entities.Product> Products { get; set; } = new();
     }
 }
-

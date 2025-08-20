@@ -5,6 +5,8 @@
 }
 
 <div class="page-content">
+    <h1>Products</h1>
+
     <div class="filters-container">
         <form method="get" asp-controller="Product" asp-action="Products" class="search-form" id="filterForm">
             <input type="text" name="SearchTerm" placeholder="Search by title" />
@@ -54,9 +56,6 @@
             </div>
         </form>
     </div>
-    <h1>Products</h1>
-
-    <a class="btn add-btn" href="/product/create">Add Product</a>
 
     <div class="product-grid">
         @foreach (var product in Model.Products)

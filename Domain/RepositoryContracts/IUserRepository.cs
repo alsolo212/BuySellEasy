@@ -1,4 +1,4 @@
-﻿using Domain.Entities;
+﻿/*using Domain.Entities;
 
 namespace Domain.RepositoryContracts
 {
@@ -9,3 +9,4 @@ namespace Domain.RepositoryContracts
         User? GetUserByEmailAndPassword(string email, string password);
     }
 }
+*/

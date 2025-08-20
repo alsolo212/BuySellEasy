@@ -1,6 +1,8 @@
 ﻿using Application.DTO.FiltersDto;
 using Application.ServiceContracts;
 using Domain.Entities;
+using Domain.IdentityEntities;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using UI.Filters;
 using UI.Helpers;
@@ -12,12 +14,14 @@ namespace BSE.Controllers
         private readonly IProductService _productService;
         private readonly IProductImageService _productImageService;
         private readonly ICategoriesService _categoriesService;
+        private readonly UserManager<User> _userManager;
 
-        public ProductController(IProductService productService, IProductImageService productImageService, ICategoriesService categoriesService)
+        public ProductController(IProductService productService, IProductImageService productImageService, ICategoriesService categoriesService, UserManager<User> userManager)
         {
             _productService = productService;
             _productImageService = productImageService;
             _categoriesService = categoriesService;
+            _userManager = userManager;
         }
 
         [Route("products")]
@@ -61,6 +65,16 @@ namespace BSE.Controllers
                 ViewBag.Categories = await _categoriesService.GetCategories();
                 return View(product);
             }
+
+            if (!User.Identity!.IsAuthenticated)
+                return RedirectToAction("Auth", "Account");
+
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+            {
+                return RedirectToAction("Auth", "Account");
+            }
+            product.UserId = user.Id;
 
             product.CreatedAt = DateTime.Now;
 

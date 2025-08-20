@@ -22,6 +22,9 @@ namespace Application.Services
 
             var query = products.AsQueryable();
 
+            if (filter.UserId.HasValue)
+                query = query.Where(p => p.UserId == filter.UserId.Value);
+
             // Поиск
             if (!string.IsNullOrWhiteSpace(filter.SearchTerm))
                 query = query.Where(p => p.Title != null &&

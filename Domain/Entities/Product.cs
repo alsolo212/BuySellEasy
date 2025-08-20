@@ -1,4 +1,5 @@
 ﻿using Domain.Abstractions;
+using Domain.IdentityEntities;
 using System.ComponentModel.DataAnnotations;
 
 namespace Domain.Entities
@@ -14,8 +15,10 @@ namespace Domain.Entities
         public DateTime? CreatedAt { get; set; } = DateTime.Now;
         public string? Location { get; set; }
         public string? ProductCondition { get; set; }
-        public Guid? CategoryId { get; set; }
+        public Guid CategoryId { get; set; }
+        public Guid UserId { get; set; }
         public Category? Category { get; set; }
+        public User? User { get; set; }
         public ICollection<ProductImage> Images { get; set; } = new List<ProductImage>();
     }
 }
