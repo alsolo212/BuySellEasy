@@ -15,7 +15,7 @@
         </div>
 
         <div class="user-actions">
-            <a href="/Account/Edit/@User.FindFirstValue(ClaimTypes.NameIdentifier)" class="edit-btn">Edit</a>
+            <a href="/edituser/@User.FindFirstValue(ClaimTypes.NameIdentifier)" class="edit-btn">Edit</a>
 
             <form asp-action="Logout" asp-controller="Account" method="post">
                 <button class="delete-btn" type="submit">Logout</button>

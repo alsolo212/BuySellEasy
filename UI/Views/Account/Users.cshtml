@@ -19,7 +19,7 @@
                 </div>
 
                 <div class="user-actions">
-                    <a href="/Account/Edit/@user.Id" class="edit-btn">Edit</a>
+                    <a href="/edituser/@user.Id" class="edit-btn">Edit</a>
 
                     <form asp-action="Delete" asp-controller="Account" asp-route-id="@user.Id" method="post">
                         <button class="delete-btn" type="submit">Delete</button>

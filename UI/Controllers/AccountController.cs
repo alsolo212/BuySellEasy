@@ -123,8 +123,8 @@ namespace UI.Controllers
             return View(users);
         }
 
-        [Route("edituser")]
-        public async Task<IActionResult> Edit(string id)
+        [Route("edituser/{id}")]
+        public async Task<IActionResult> EditUser(string id)
         {
             var user = await _userManager.FindByIdAsync(id);
             if (user == null) return NotFound();
@@ -132,7 +132,34 @@ namespace UI.Controllers
             return View(user);
         }
 
-        // POST: /Account/Delete/{id}
+        [HttpPost]
+        [Route("edituser/{id}")]
+        public async Task<IActionResult> EditUser(Domain.IdentityEntities.User model)
+        {
+            var user = await _userManager.FindByIdAsync(model.Id.ToString());
+            if (user == null) return NotFound();
+
+            // Обновляем только нужные поля
+            user.UserName = model.UserName;
+            user.Email = model.Email;
+            user.PhoneNumber = model.PhoneNumber;
+            user.ProfileImageUrl = model.ProfileImageUrl;
+            user.IsVerified = model.IsVerified;
+
+            var result = await _userManager.UpdateAsync(user);
+
+            if (!result.Succeeded)
+            {
+                foreach (var error in result.Errors)
+                {
+                    ModelState.AddModelError("", error.Description);
+                }
+                return View(user);
+            }
+
+            return RedirectToAction("Users");
+        }
+
         [HttpPost]
         public async Task<IActionResult> Delete(string id)
         {

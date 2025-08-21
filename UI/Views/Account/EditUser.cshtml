@@ -1,0 +1,50 @@
+﻿@model Domain.IdentityEntities.User
+@{
+    ViewData["Title"] = "Edit User";
+}
+
+<div class="block-section" id="editUser">
+    <h2>Edit User</h2>
+
+    <form asp-action="EditUser" asp-controller="Account" method="post">
+        <input type="hidden" asp-for="Id" />
+
+        <!-- Profile Image URL -->
+        <div class="form-group">
+            <input asp-for="ProfileImageUrl" placeholder="Profile Image Url" />
+        </div>
+
+        <!-- IsVerified -->
+        <div class="form-group">
+            <label asp-for="IsVerified">Verified</label>
+            <input asp-for="IsVerified" type="checkbox" />
+        </div>
+
+        <!-- Username -->
+        <div class="form-group">
+            <input asp-for="UserName" placeholder="Nick Name" required />
+            <span asp-validation-for="UserName" class="text-danger"></span>
+        </div>
+
+        <!-- Email -->
+        <div class="form-group">
+            <input asp-for="Email" placeholder="Email" required type="email" />
+            <span asp-validation-for="Email" class="text-danger"></span>
+        </div>
+
+        <!-- Phone -->
+        <div class="form-group">
+            <input asp-for="PhoneNumber" placeholder="Phone Number" />
+            <span asp-validation-for="PhoneNumber" class="text-danger"></span>
+        </div>
+
+        <button class="big-btn" type="submit">Save</button>
+    </form>
+
+    @if (!ViewData.ModelState.IsValid)
+    {
+        <div class="alert alert-danger mt-3">
+            Please fix validation errors and try again.
+        </div>
+    }
+</div>
