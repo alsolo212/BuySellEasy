@@ -251,21 +251,37 @@ button, .btn {
     }
 
 /* Большие кнопки — на всю ширину */
-.big-btn {
+.big-btn,
+.big-btn-grey {
     margin-top: 20px;
     padding: 12px 20px;
     font-size: 16px;
-    background-color: #333;
-    color: #fff;
     border: none;
     border-radius: 10px;
     cursor: pointer;
     transition: background-color 0.2s ease;
     width: 100%;
 }
+/* Жёлтая кнопка — Edit */
+.big-btn {
+    background-color: #333;
+    color: #fff;
+}
 
     .big-btn:hover {
         background-color: #555;
+    }
+
+/* Красная кнопка — Delete */
+.big-btn-grey {
+    background-color: #EAEFF3;
+    color: #333;
+    border: 2px;
+    border-color: #333;
+}
+
+    .big-btn-grey:hover {
+        background-color: #D6E2ED;
     }
 
 .edit-btn,
@@ -626,11 +642,39 @@ select {
     }
 
 /*Стили DETAILS*/
+.breadcrumbs {
+    display: flex;
+    align-items: center;
+    font-size: 14px;
+    margin-bottom: 15px;
+}
+
+    .breadcrumbs .back-link {
+        display: flex;
+        align-items: center;
+        margin-right: 8px;
+        color: #0077b6;
+        font-size: 22px;
+        text-decoration: none;
+    }
+
+    .breadcrumbs .icon-back {
+        width: 24px;
+        height: 24px;
+        margin-right: 4px;
+        vertical-align: middle;
+        color: #0077b6;
+    }
+
+    .breadcrumbs .crumb {
+        color: #0077b6;
+        margin: 0 4px;
+    }
+
 .product-details-container {
     display: flex;
     flex-direction: row;
-    gap: 30px;
-    margin: 20px;
+    gap: 20px;
     flex-wrap: wrap;
 }
 

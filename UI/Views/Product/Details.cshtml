@@ -3,46 +3,74 @@
     ViewData["Title"] = "Product Details";
 }
 
-<div class="product-details-container">
-    <!-- Блок с фото (левая колонка) -->
-    <div class="gallery-section">
-        @if (Model.Images != null && Model.Images.Any())
-        {
-            <div class="thumbnail-column">
-                @foreach (var img in Model.Images.OrderBy(i => i.SortOrder))
-                {
-                    <div class="thumbnail-item" data-target="@img.ImagePath">
-                        <img src="@img.ImagePath" alt="Thumbnail" />
-                    </div>
-                }
-            </div>
+<div class="page-content">
+    <div class="breadcrumbs">
+        <!-- SVG стрелка + Back -->
+        <a href="@Context.GetCallBackUrl("/products")" class="back-link">
+            <svg xmlns="http://www.w3.org/2000/svg"
+                 fill="none" viewBox="0 0 24 24"
+                 stroke-width="2" stroke="currentColor"
+                 class="icon-back">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
+            <strong>Back</strong>
+        </a>
 
-            <div class="main-image-container">
-                <button class="nav-arrow left prev">❮</button>
-                <img id="mainProductImage"
-                     src="@Model.Images.OrderBy(i => i.SortOrder).FirstOrDefault()?.ImagePath"
-                     alt="Main Image" />
-                <button class="nav-arrow right next">❯</button>
-            </div>
-        }
-        else
+        <a href="/" class="crumb">Home</a>
+        <span class="crumb">/</span>
+        <a href="/products" class="crumb">Products</a>
+
+        @if (Model.Category != null)
         {
-            <div class="main-image-container">
-                <span>No images available</span>
-            </div>
+            <span class="crumb">/</span>
+            <a href="/products?CategoryId=@Model.Category.Id" class="crumb">
+                @Model.Category.Name
+            </a>
         }
     </div>
 
-    <!-- Блок с информацией (правая колонка) -->
-    <div class="info-section">
-        <h2>@Model.Title</h2>
-        <p class ="product-condition">@Model.ProductCondition</p>
-        <p class="product-condition">@Model.Category?.Name</p>
-        <p><strong>Description:</strong> @Model.Description</p>
-        <p><strong>Price:</strong> @Model.ProductPrice?.ToString("N0") $</p>
-        <p><strong>Location:</strong> @Model.Location</p>
-        <p><strong>Created:</strong> @Model.CreatedAt?.ToString("dd.MM.yyyy")</p>
-        
-        <a href="@Context.GetCallBackUrl("/products")">Back to Products</a>
+    <div class="product-details-container">
+        <!-- Блок с фото (левая колонка) -->
+        <div class="gallery-section">
+            @if (Model.Images != null && Model.Images.Any())
+            {
+                <div class="thumbnail-column">
+                    @foreach (var img in Model.Images.OrderBy(i => i.SortOrder))
+                    {
+                        <div class="thumbnail-item" data-target="@img.ImagePath">
+                            <img src="@img.ImagePath" alt="Thumbnail" />
+                        </div>
+                    }
+                </div>
+
+                <div class="main-image-container">
+                    <button class="nav-arrow left prev">❮</button>
+                    <img id="mainProductImage"
+                         src="@Model.Images.OrderBy(i => i.SortOrder).FirstOrDefault()?.ImagePath"
+                         alt="Main Image" />
+                    <button class="nav-arrow right next">❯</button>
+                </div>
+            }
+            else
+            {
+                <div class="main-image-container">
+                    <span>No images available</span>
+                </div>
+            }
+        </div>
+
+        <!-- Блок с информацией (правая колонка) -->
+        <div class="info-section">
+            <p class="product-location">Published @Model.CreatedAt?.ToString("dd.MM.yyyy")</p>
+            <h2>@Model.Title</h2>
+            <p class="product-condition">@Model.ProductCondition</p>
+            <p class="product-condition">@Model.Category?.Name</p>
+            <p><strong style="font-size: 24px">@Model.ProductPrice?.ToString("N0") $</strong></p>
+            <button class="big-btn" style="background: red;">Buy</button>
+            <button class="big-btn-grey" style="margin-top: 5px;">Add to cart</button>
+            <p><strong style="font-size: 24px">Description:</strong></p>
+            <p>@Model.Description</p>
+            <p><strong>Location:</strong> @Model.Location</p>
+        </div>
     </div>
 </div>
