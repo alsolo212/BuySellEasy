@@ -44,8 +44,30 @@ namespace BSE.Controllers
             if (product == null)
                 return NotFound();
 
+            // по умолчанию кнопки скрыты
+            ViewBag.CanEdit = false;
+            ViewBag.CanAddToCart = false;
+
+            // если юзер авторизован
+            if (User.Identity?.IsAuthenticated == true)
+            {
+                var userId = Guid.Parse(_userManager.GetUserId(User)!);
+
+                if (product.UserId == userId)
+                {
+                    // свой товар → можно редактировать/удалять
+                    ViewBag.CanEdit = true;
+                }
+                else
+                {
+                    // чужой товар → можно добавить в корзину
+                    ViewBag.CanAddToCart = true;
+                }
+            }
+
             return View(product);
         }
+
 
         [HttpGet]
         [Route("product/create")]

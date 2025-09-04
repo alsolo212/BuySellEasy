@@ -66,8 +66,28 @@
             <p class="product-condition">@Model.ProductCondition</p>
             <p class="product-condition">@Model.Category?.Name</p>
             <p><strong style="font-size: 24px">@Model.ProductPrice?.ToString("N0") $</strong></p>
-            <button class="big-btn" style="background: red;">Buy</button>
-            <button class="big-btn-grey" style="margin-top: 5px;">Add to cart</button>
+            @if (ViewBag.CanEdit == true)
+            {
+                <form asp-action="Edit" asp-controller="Product" asp-route-id="@Model.Id" method="get" style="display:inline;">
+                    @Html.AntiForgeryToken()
+                    <button class="big-btn" style="background: #ffd93d; color: black;">Edit</button>
+                </form>
+                <form asp-action="Delete" asp-controller="Product" asp-route-id="@Model.Id" method="post" style="display:inline;">
+                    @Html.AntiForgeryToken()
+                    <button class="big-btn" style="background: #ff4d4f; margin-top: 5px;">Delete</button>
+                </form>
+            }
+            else if (ViewBag.CanAddToCart == true)
+            {
+                <button type="button" class="big-btn" style="background: #ff4d4f;">Buy</button>
+                <form asp-controller="Home" asp-action="AddToCart" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="productId" value="@Model.Id" />
+                    <button type="submit" class="big-btn-grey" style="margin-top: 5px;">Add to Cart</button>
+                </form>
+            }
+
+
             <p><strong style="font-size: 24px">Description:</strong></p>
             <p>@Model.Description</p>
             <p><strong>Location:</strong> @Model.Location</p>

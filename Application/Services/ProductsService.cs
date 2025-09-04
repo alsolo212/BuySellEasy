@@ -8,10 +8,12 @@ namespace Application.Services
     public class ProductsService : IProductService
     {
         private readonly IProductRepository _repository;
+        private readonly ICartItemRepository _cartItemRepository;
 
-        public ProductsService(IProductRepository repository)
+        public ProductsService(IProductRepository repository, ICartItemRepository cartItemRepository)
         {
             _repository = repository;
+            _cartItemRepository = cartItemRepository;
         }
 
         public async Task<List<Product>> GetProducts(ProductFilterDto filter)
@@ -63,6 +65,13 @@ namespace Application.Services
             return query.ToList();
         }
 
+        public async Task<List<Product>> GetProductsByUserIdAsync(Guid userId)
+        {
+            var products = await _repository.GetAllWithImagesAsync();
+            return products.Where(p => p.UserId == userId).ToList();
+        }
+
+
         public async Task<Product?> GetProductById(Guid id)
         {
             var product = await _repository.GetProductWithImagesAsync(id);
@@ -109,6 +118,17 @@ namespace Application.Services
             var product = await _repository.GetProductWithImagesAsync(id);
             if (product != null)
             {
+                // Удаляем CartItems (корзину с этим продуктом)
+                if (product.CartItems?.Any() == true)
+                {
+                    foreach (var cartItem in product.CartItems.ToList())
+                    {
+                        // через CartItemRepository
+                        _cartItemRepository.DeleteElement(cartItem);
+                    }
+                }
+
+                // Удаляем физические файлы изображений
                 if (product.Images != null)
                 {
                     foreach (var image in product.Images)
@@ -125,6 +145,7 @@ namespace Application.Services
                 await _repository.SaveAsync();
             }
         }
+
 
         private string GetImagePhysicalPath(string imagePath)
         {

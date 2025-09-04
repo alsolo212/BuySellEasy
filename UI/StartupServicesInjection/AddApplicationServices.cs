@@ -1,5 +1,6 @@
 ﻿using Application.ServiceContracts;
 using Application.Services;
+using Domain.Entities;
 using Domain.IdentityEntities;
 using Domain.RepositoryContracts;
 using Infrastructure.DbContextt;
@@ -48,6 +49,10 @@ namespace UI.StartupServicesInjection
             services.AddScoped<IProductRepository, ProductRepository>();
             services.AddScoped<IProductImageRepository, ProductImageRepository>();
             services.AddScoped<IProductImageService, ProductImagesService>();
+            services.AddScoped<ICartItemRepository, CartItemRepository>();
+            services.AddScoped<ICartService, CartService>();
+            services.AddScoped<IGenericRepository<Product>, GenericRepository<Product>>();
+
 
             // HttpContext и Session
             services.AddHttpContextAccessor();

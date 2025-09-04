@@ -1,6 +1,7 @@
 ﻿using Application.DTO.FiltersDto;
 using Application.DTO.IdentityDto;
 using Application.ServiceContracts;
+using Application.Services;
 using Domain.IdentityEntities;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -15,9 +16,11 @@ namespace UI.Controllers
         private readonly SignInManager<User> _signInManager;
         private readonly IProductService _productService;
         private readonly ICategoriesService _categoriesService;
+        private readonly ICartService _cartService;
 
-        public AccountController(IProductService productService, ICategoriesService categoriesService, UserManager<User> userManager, SignInManager<User> signInManager)
+        public AccountController(ICartService cartService, IProductService productService, ICategoriesService categoriesService, UserManager<User> userManager, SignInManager<User> signInManager)
         {
+            _cartService = cartService;
             _productService = productService;
             _categoriesService = categoriesService;
             _userManager = userManager;
@@ -161,13 +164,43 @@ namespace UI.Controllers
         }
 
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> Delete(string id)
         {
             var user = await _userManager.FindByIdAsync(id);
-            if (user == null) return NotFound();
 
-            await _userManager.DeleteAsync(user);
-            return RedirectToAction("Users");
+            if (user == null)
+                return NotFound();
+
+            Guid userGuid = user.Id;
+
+            // Загружаем продукты пользователя вместе с корзинами
+            var products = await _productService.GetProductsByUserIdAsync(userGuid);
+
+            foreach (var product in products)
+            {
+                await _productService.DeleteProduct(product.Id);
+            }
+
+            // Удаляем корзину юзера
+            var userCartItems = await _cartService.GetCartItemsByUserIdAsync(userGuid);
+            foreach (var cartItem in userCartItems)
+            {
+                await _cartService.DeleteCartItemAsync(cartItem.Id);
+            }
+
+            // Удаляем пользователя
+            var result = await _userManager.DeleteAsync(user);
+
+            if (result.Succeeded)
+                return RedirectToAction("Users", "Account");
+
+            foreach (var error in result.Errors)
+            {
+                ModelState.AddModelError(string.Empty, error.Description);
+            }
+
+            return View(user);
         }
     }
 }

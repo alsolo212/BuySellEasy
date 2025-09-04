@@ -18,6 +18,7 @@ namespace Infrastructure.Repository
             return await _dbSet
                 .Include(p => p.Category)
                 .Include(p => p.Images)
+                .Include(p => p.CartItems)
                 .FirstOrDefaultAsync(p => p.Id == id);
         }
 
@@ -26,6 +27,7 @@ namespace Infrastructure.Repository
             return await _dbSet
                 .Include(p => p.Category)
                 .Include(p => p.Images)
+                .Include(p => p.CartItems)
                 .ToListAsync();
         }
     }

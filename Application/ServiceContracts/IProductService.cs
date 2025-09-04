@@ -7,6 +7,8 @@ namespace Application.ServiceContracts
     {
         public Task<List<Product>> GetProducts(ProductFilterDto filter);
 
+        Task<List<Product>> GetProductsByUserIdAsync(Guid userId);
+
         public Task<Product?> GetProductById(Guid id);
 
         public Task AddProduct(Product product);

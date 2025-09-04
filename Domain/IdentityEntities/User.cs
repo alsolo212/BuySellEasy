@@ -16,5 +16,6 @@ namespace Domain.IdentityEntities
         public int ActiveListingsCount { get; set; }
 
         public ICollection<Product> Products { get; set; } = new List<Product>();
+        public ICollection<CartItem> CartItems { get; set; } = new List<CartItem>();
     }
 }

@@ -20,5 +20,6 @@ namespace Domain.Entities
         public Category? Category { get; set; }
         public User? User { get; set; }
         public ICollection<ProductImage> Images { get; set; } = new List<ProductImage>();
+        public ICollection<CartItem> CartItems { get; set; } = new List<CartItem>();
     }
 }
