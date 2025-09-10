@@ -49,14 +49,20 @@ th {
     width: 100%;
     background-color: #ffffff;
     border-bottom: 1px solid #dee2e6;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 14px 32px;
+    padding: 14px 28px;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03);
     position: sticky;
     top: 0;
     z-index: 100;
+}
+
+.navbar-container {
+    max-width: 1280px;
+    margin: 0 auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
 }
 
 .navbar-brand {
@@ -66,14 +72,14 @@ th {
     text-transform: uppercase;
     letter-spacing: 1px;
 }
-
 /* Список навигации */
+
 .navbar-menu {
     list-style: none;
     display: flex;
     gap: 24px;
     margin: 0;
-    padding-right: 50px;
+    padding-right: 44px;
 }
 
     .navbar-menu li {
@@ -92,6 +98,95 @@ th {
         .navbar-menu a:hover {
             background-color: #f0f0f0;
         }
+
+/* Мобильные иконки */
+.navbar-mobile-icons {
+    display: none;
+    gap: 24px;
+    padding-right: 44px;
+    align-items: center;
+}
+    .navbar-mobile-icons img {
+        width: 26px;
+        height: 26px;
+    }
+
+/* Универсальные иконки-кнопки */
+.icon-btn {
+    background: none;
+    padding: 0;
+    margin: 0;
+    align-items: center;
+}
+    .icon-btn img {
+        width: 26px;
+        height: 26px;
+    }
+
+/* Полноэкранное меню */
+.mobile-menu {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 0;
+    width: 100%;
+    background: rgba(255, 255, 255, 0.98);
+    overflow: hidden;
+    transition: height 0.4s ease;
+    z-index: 2000;
+}
+
+    .mobile-menu.open {
+        height: 100%;
+    }
+
+.mobile-menu-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 24px;
+    height: 100%;
+}
+
+    .mobile-menu-content a {
+        font-size: 22px;
+        font-weight: 600;
+        color: #333;
+        text-decoration: none;
+    }
+
+        .mobile-menu-content a:hover {
+            color: #0077b6;
+        }
+
+/* Крестик закрытия */
+.close-btn {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    font-size: 42px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #333;
+    transition: color 0.3s ease;
+}
+
+    .close-btn:hover {
+        color: #0077b6;
+    }
+
+/* Адаптивность */
+@media (max-width: 768px) {
+    .navbar-desktop {
+        display: none;
+    }
+
+    .navbar-mobile-icons {
+        display: flex;
+    }
+}
 
 .footer {
     background-color: #ffffff;
@@ -760,6 +855,7 @@ select {
     background-color: #ffffff;
     border-radius: 16px;
     padding: 30px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
 }
 
 /* Адаптивность */

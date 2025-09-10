@@ -1,4 +1,4 @@
-﻿@model Domain.IdentityEntities.User
+﻿@model Application.DTO.IdentityDto.EditUserDTO
 @{
     ViewData["Title"] = "Edit User";
 }
@@ -9,15 +9,21 @@
     <form asp-action="EditUser" asp-controller="Account" method="post">
         <input type="hidden" asp-for="Id" />
 
-        <!-- Profile Image URL -->
-        <div class="form-group">
-            <input asp-for="ProfileImageUrl" placeholder="Profile Image Url" />
-        </div>
-
         <!-- IsVerified -->
         <div class="form-group">
             <label asp-for="IsVerified">Verified</label>
             <input asp-for="IsVerified" type="checkbox" />
+        </div>
+
+        <!-- Is Admin -->
+        <div class="form-group">
+            <label asp-for="IsAdmin">Admin</label>
+            <input asp-for="IsAdmin" type="checkbox" />
+        </div>
+
+        <!-- Profile Image URL -->
+        <div class="form-group">
+            <input asp-for="ProfileImageUrl" placeholder="Profile Image Url" />
         </div>
 
         <!-- Username -->
@@ -34,8 +40,8 @@
 
         <!-- Phone -->
         <div class="form-group">
-            <input asp-for="PhoneNumber" placeholder="Phone Number" />
-            <span asp-validation-for="PhoneNumber" class="text-danger"></span>
+            <input asp-for="Phone" placeholder="Phone Number" type="text" />
+            <span asp-validation-for="Phone" class="text-danger"></span>
         </div>
 
         <button class="big-btn" type="submit">Save</button>

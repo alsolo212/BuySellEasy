@@ -3,6 +3,8 @@ using Application.DTO.IdentityDto;
 using Application.ServiceContracts;
 using Application.Services;
 using Domain.IdentityEntities;
+using Infrastructure.DbContextt;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -14,17 +16,25 @@ namespace UI.Controllers
     {
         private readonly UserManager<User> _userManager;
         private readonly SignInManager<User> _signInManager;
+        private readonly RoleManager<Role> _roleManager;
         private readonly IProductService _productService;
         private readonly ICategoriesService _categoriesService;
         private readonly ICartService _cartService;
 
-        public AccountController(ICartService cartService, IProductService productService, ICategoriesService categoriesService, UserManager<User> userManager, SignInManager<User> signInManager)
+        public AccountController(
+            ICartService cartService,
+            IProductService productService,
+            ICategoriesService categoriesService,
+            UserManager<User> userManager,
+            SignInManager<User> signInManager,
+            RoleManager<Role> roleManager)
         {
             _cartService = cartService;
             _productService = productService;
             _categoriesService = categoriesService;
             _userManager = userManager;
             _signInManager = signInManager;
+            _roleManager = roleManager;
         }
 
         [Route("auth")]
@@ -119,6 +129,7 @@ namespace UI.Controllers
             return RedirectToAction("Auth");
         }
 
+        [Authorize(Roles = IdentitySeed.Admin)]
         [Route("users")]
         public IActionResult Users()
         {
@@ -127,27 +138,42 @@ namespace UI.Controllers
         }
 
         [Route("edituser/{id}")]
-        public async Task<IActionResult> EditUser(string id)
+        public async Task<IActionResult> EditUser(Guid id)
         {
-            var user = await _userManager.FindByIdAsync(id);
+            var user = await _userManager.FindByIdAsync(id.ToString());
             if (user == null) return NotFound();
 
-            return View(user);
+            var dto = new EditUserDTO
+            {
+                Id = Guid.Parse(user.Id.ToString()),
+                UserName = user.UserName ?? string.Empty,
+                Email = user.Email ?? string.Empty,
+                Phone = user.PhoneNumber,
+                ProfileImageUrl = user.ProfileImageUrl,
+                IsVerified = user.EmailConfirmed,
+                IsAdmin = await _userManager.IsInRoleAsync(user, "Admin")
+            };
+
+            return View(dto);
         }
+
 
         [HttpPost]
         [Route("edituser/{id}")]
-        public async Task<IActionResult> EditUser(Domain.IdentityEntities.User model)
+        public async Task<IActionResult> EditUser(EditUserDTO dto)
         {
-            var user = await _userManager.FindByIdAsync(model.Id.ToString());
+            if (!ModelState.IsValid)
+                return View(dto);
+
+            var user = await _userManager.FindByIdAsync(dto.Id.ToString());
             if (user == null) return NotFound();
 
             // Обновляем только нужные поля
-            user.UserName = model.UserName;
-            user.Email = model.Email;
-            user.PhoneNumber = model.PhoneNumber;
-            user.ProfileImageUrl = model.ProfileImageUrl;
-            user.IsVerified = model.IsVerified;
+            user.UserName = dto.UserName;
+            user.Email = dto.Email;
+            user.PhoneNumber = dto.Phone;
+            user.ProfileImageUrl = dto.ProfileImageUrl;
+            user.IsVerified = dto.IsVerified;
 
             var result = await _userManager.UpdateAsync(user);
 
@@ -158,6 +184,26 @@ namespace UI.Controllers
                     ModelState.AddModelError("", error.Description);
                 }
                 return View(user);
+            }
+
+            var requiredRole = dto.IsAdmin ? IdentitySeed.Admin : IdentitySeed.User;
+            var isAdmin = await _userManager.IsInRoleAsync(user, IdentitySeed.Admin);
+            var isUser = await _userManager.IsInRoleAsync(user, IdentitySeed.User);
+            if (dto.IsAdmin&& !isAdmin)
+            {
+                await _userManager.AddToRoleAsync(user, IdentitySeed.Admin);
+            }
+            if (!dto.IsAdmin && !isUser)
+            {
+                await _userManager.AddToRoleAsync(user, IdentitySeed.User);
+            }
+            if (dto.IsAdmin && isUser)
+            {
+                await _userManager.RemoveFromRoleAsync(user, IdentitySeed.User);
+            }
+            if (!dto.IsAdmin && isAdmin)
+            {
+                await _userManager.RemoveFromRoleAsync(user, IdentitySeed.Admin);
             }
 
             return RedirectToAction("Users");

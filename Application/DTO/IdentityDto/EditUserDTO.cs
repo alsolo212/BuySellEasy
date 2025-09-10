@@ -1,10 +1,14 @@
 ﻿using Domain.Enums;
 using System.ComponentModel.DataAnnotations;
 
+
 namespace Application.DTO.IdentityDto
 {
-    public class RegisterDTO
+    public class EditUserDTO
     {
+        public Guid Id { get; set; }
+        public string? ProfileImageUrl { get; set; }
+
         [Required(ErrorMessage = "Username is required")]
         public string UserName { get; set; } = string.Empty;
 
@@ -17,12 +21,16 @@ namespace Application.DTO.IdentityDto
         [DataType(DataType.PhoneNumber)]
         public string? Phone { get; set; }
 
-        [Required(ErrorMessage = "Password is required")]
+        /*[Required(ErrorMessage = "Password is required")]
         [DataType(DataType.Password)]
         public string Password { get; set; } = string.Empty;
 
         [Compare("Password", ErrorMessage = "Passwords do not match")]
         [DataType(DataType.Password)]
-        public string ConfirmPassword { get; set; } = string.Empty;
+        public string ConfirmPassword { get; set; } = string.Empty;*/
+
+        public bool IsVerified { get; set; } = true;
+
+        public bool IsAdmin { get; set; } = false;
     }
 }

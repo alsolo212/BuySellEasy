@@ -1,4 +1,6 @@
-﻿namespace Application.DTO.IdentityDto
+﻿using Domain.Enums;
+
+namespace Application.DTO.IdentityDto
 {
     public class ProfileDTO
     {

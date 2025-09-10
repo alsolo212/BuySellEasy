@@ -4,7 +4,7 @@
 }
 
 <div class="page-content">
-    <h1>Your cart</h1>
+    <h1>Your cart:</h1>
 
     <div class="user-grid">
         @if (!Model.Any())
@@ -44,12 +44,7 @@
                         <form asp-action="RemoveFromCart" asp-controller="Home" method="post" style="position: absolute; top: 0; right: 0;">
                             @Html.AntiForgeryToken()
                             <input type="hidden" name="cartItemId" value="@item.Id" />
-                            <button type="submit" style="background: transparent; border: none; cursor: pointer; top: 0;">
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                     stroke-width="2" stroke="currentColor" style="width: 20px; height: 20px; color: red;">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                            </button>
+                            <button type="submit" style="background: transparent; border: none; cursor: pointer; color: #ff4d4f; font-size: 20px; margin: 0; padding: 0;">🗙</button>
                         </form>
                     </div>
                     <!-- Цена -->
