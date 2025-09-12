@@ -81,17 +81,17 @@
                     <p class="product-location">@product.Location — @product.CreatedAt?.ToString("dd.MM.yyyy")</p>
                 </div>
                 <div class="product-price">@product.ProductPrice?.ToString("N0") $</div>
-
-                <div class="product-actions">
-                    <a href="/product/edit/@product.Id?" class="edit-btn">Edit</a>
-                    <form asp-action="Delete" asp-controller="Product" asp-route-id="@product.Id" method="post"
-                          style="display:inline;">
-                        <button class="delete-btn" type="submit">Delete</button>
-                    </form>
-                </div>
+                @if (User.IsInRole("Admin"))
+                {
+                    <div class="product-actions">
+                        <a href="/product/edit/@product.Id?" class="edit-btn">Edit</a>
+                        <form asp-action="Delete" asp-controller="Product" asp-route-id="@product.Id" method="post"
+                              style="display:inline;">
+                            <button class="delete-btn" type="submit">Delete</button>
+                        </form>
+                    </div>
+                }
             </div>
         }
     </div>
-
-    <a href="/home">Go to home page</a>
 </div>

@@ -19,8 +19,11 @@
                 <ul class="navbar-menu">
                     <li><a href="/products">Products</a></li>
                     <li><a href="/cart">Cart</a></li>
-                    <li><a href="/users">All Users</a></li>
                     <li><a href="/profile">Profile</a></li>
+                    @if (User.IsInRole("Admin"))
+                    {
+                        <li><a href="/users">All Users</a></li>
+                    }
                 </ul>
             </nav>
 
@@ -39,12 +42,15 @@
     <div id="mobile-menu" class="mobile-menu">
         <button id="close-menu" class="close-btn">×</button>
         <div class="mobile-menu-content">
-            <button href="/products/add" style="font-size: 20px;">Add Product</button>
+            <a href="/product/create" class="btn add-btn" style="color: #fff; font-size: 20px;">Add Product</a>
             <a href="/home">Home</a>
             <a href="/products">Products</a>
             <a href="/cart">Cart</a>
             <a href="/profile">Profile</a>
-            <a href="/users">All Users</a>
+            @if (User.IsInRole("Admin"))
+            {
+                <a href="/users">All Users</a>
+            }
         </div>
     </div>
 

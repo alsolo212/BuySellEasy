@@ -9,17 +9,16 @@
     <form asp-action="EditUser" asp-controller="Account" method="post">
         <input type="hidden" asp-for="Id" />
 
-        <!-- IsVerified -->
-        <div class="form-group">
-            <label asp-for="IsVerified">Verified</label>
-            <input asp-for="IsVerified" type="checkbox" />
-        </div>
-
-        <!-- Is Admin -->
-        <div class="form-group">
-            <label asp-for="IsAdmin">Admin</label>
-            <input asp-for="IsAdmin" type="checkbox" />
-        </div>
+        <!-- Status -->
+        @if (User.IsInRole("Admin"))
+        {
+            <div class="form-group">
+                <input asp-for="IsAdmin" type="checkbox" />
+                <label asp-for="IsAdmin">Admin</label>
+                <input asp-for="IsVerified" type="checkbox" />
+                <label asp-for="IsVerified">Verified</label>
+            </div>
+        }
 
         <!-- Profile Image URL -->
         <div class="form-group">

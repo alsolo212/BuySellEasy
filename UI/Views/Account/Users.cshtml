@@ -1,4 +1,4 @@
-﻿@model List<Domain.IdentityEntities.User>
+﻿@model List<(Domain.IdentityEntities.User user, IList<string> roles)>
 
 @{
     ViewData["Title"] = "All Users";
@@ -6,10 +6,10 @@
 
 <div class="page-content">
     <h1>Users:</h1>
-
     <div class="user-grid">
-        @foreach (var user in Model)
+        @foreach (var item in Model.Where(m => m.roles.Contains("User")))
         {
+            var user = item.user;
             <div class="user-card">
                 <div class="user-avatar"></div>
 
@@ -30,4 +30,26 @@
     </div>
 
     <h1>Admins:</h1>
+    <div class="user-grid">
+        @foreach (var item in Model.Where(m => m.roles.Contains("Admin")))
+        {
+            var user = item.user;
+            <div class="user-card">
+                <div class="user-avatar"></div>
+
+                <div class="user-info">
+                    <p class="user-name">@user.UserName</p>
+                    <p class="user-email">@user.Email</p>
+                </div>
+
+                <div class="user-actions">
+                    <a href="/edituser/@user.Id" class="edit-btn">Edit</a>
+
+                    <form asp-action="Delete" asp-controller="Account" asp-route-id="@user.Id" method="post">
+                        <button class="delete-btn" type="submit">Delete</button>
+                    </form>
+                </div>
+            </div>
+        }
+    </div>
 </div>

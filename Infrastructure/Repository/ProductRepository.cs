@@ -16,6 +16,7 @@ namespace Infrastructure.Repository
         public async Task<Product?> GetProductWithImagesAsync(Guid id)
         {
             return await _dbSet
+                .Include(p => p.User)
                 .Include(p => p.Category)
                 .Include(p => p.Images)
                 .Include(p => p.CartItems)
@@ -25,6 +26,7 @@ namespace Infrastructure.Repository
         public async Task<IEnumerable<Product>> GetAllWithImagesAsync()
         {
             return await _dbSet
+                .Include(p => p.User)
                 .Include(p => p.Category)
                 .Include(p => p.Images)
                 .Include(p => p.CartItems)

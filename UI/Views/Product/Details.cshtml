@@ -93,4 +93,27 @@
             <p><strong>Location:</strong> @Model.Location</p>
         </div>
     </div>
+    <br />
+    <div class="product-details-container">
+        <!-- Contact блок -->
+        <div class="user-card" style="flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center;">
+            <p class="user-name">Contact:</p>
+            <button type="submit" class="big-btn-grey" style="margin-top: 0px;">Write</button>
+        </div>
+        <!-- Автор объявления -->
+        <div class="user-card" style="flex: 1;">
+            <div class="user-avatar">
+                @if (!string.IsNullOrEmpty(Model.User?.ProfileImageUrl))
+                {
+                    <img src="@Model.User.ProfileImageUrl" alt="Avatar" style="width:100%; height:100%; object-fit:cover; border-radius:8px;" />
+                }
+            </div>
+
+            <div class="user-info">
+                <p class="user-name">@Model.User?.UserName</p>
+                <p class="user-email">@Model.User?.Email</p>
+            </div>
+        </div>
+    </div>
+
 </div>

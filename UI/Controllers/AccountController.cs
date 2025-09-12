@@ -131,18 +131,32 @@ namespace UI.Controllers
 
         [Authorize(Roles = IdentitySeed.Admin)]
         [Route("users")]
-        public IActionResult Users()
+        public async Task<IActionResult> Users()
         {
             var users = _userManager.Users.ToList();
-            return View(users);
+            var model = new List<(User user, IList<string> roles)>();
+
+            foreach (var u in users)
+            {
+                var roles = await _userManager.GetRolesAsync(u);
+                model.Add((u, roles));
+            }
+
+            return View(model);
         }
 
         [Route("edituser/{id}")]
         public async Task<IActionResult> EditUser(Guid id)
         {
+            var currentUserId = _userManager.GetUserId(User);
+            var isAdmin = User.IsInRole(IdentitySeed.Admin);
+            if (currentUserId != id.ToString() && !isAdmin)
+            {
+                return RedirectToAction("Profile");
+            }
+
             var user = await _userManager.FindByIdAsync(id.ToString());
             if (user == null) return NotFound();
-
             var dto = new EditUserDTO
             {
                 Id = Guid.Parse(user.Id.ToString()),
@@ -150,13 +164,12 @@ namespace UI.Controllers
                 Email = user.Email ?? string.Empty,
                 Phone = user.PhoneNumber,
                 ProfileImageUrl = user.ProfileImageUrl,
-                IsVerified = user.EmailConfirmed,
-                IsAdmin = await _userManager.IsInRoleAsync(user, "Admin")
+                IsVerified = user.IsVerified,
+                IsAdmin = await _userManager.IsInRoleAsync(user, IdentitySeed.Admin)
             };
 
             return View(dto);
         }
-
 
         [HttpPost]
         [Route("edituser/{id}")]
@@ -187,8 +200,15 @@ namespace UI.Controllers
             }
 
             var requiredRole = dto.IsAdmin ? IdentitySeed.Admin : IdentitySeed.User;
-            var isAdmin = await _userManager.IsInRoleAsync(user, IdentitySeed.Admin);
             var isUser = await _userManager.IsInRoleAsync(user, IdentitySeed.User);
+            var currentUserId = _userManager.GetUserId(User);
+            var isAdmin = await _userManager.IsInRoleAsync(user!, IdentitySeed.Admin);
+            var isCurrentUserAdmin = User.IsInRole(IdentitySeed.Admin);
+
+            if (currentUserId != user!.Id.ToString() && !isCurrentUserAdmin)
+            {
+                return RedirectToAction("Profile");
+            }
             if (dto.IsAdmin&& !isAdmin)
             {
                 await _userManager.AddToRoleAsync(user, IdentitySeed.Admin);
