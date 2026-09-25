@@ -6,7 +6,7 @@
 <div class="block-section" id="editUser">
     <h2>Edit User</h2>
 
-    <form asp-action="EditUser" asp-controller="Account" method="post">
+    <form asp-action="EditUser" asp-controller="Account" method="post" enctype="multipart/form-data">
         <input type="hidden" asp-for="Id" />
 
         <!-- Status -->
@@ -21,8 +21,37 @@
         }
 
         <!-- Profile Image URL -->
-        <div class="form-group">
-            <input asp-for="ProfileImageUrl" placeholder="Profile Image Url" />
+        <!-- Существующий аватар -->
+        <div class="existing-photos">
+            <h3>Current Avatar:</h3>
+            <div class="photo-grid" id="avatarGrid">
+                @if (!string.IsNullOrEmpty(Model.ProfileImageUrl))
+                {
+                    <div class="photo-item">
+                        <img src="@Model.ProfileImageUrl" alt="User Avatar" />
+                    </div>
+                }
+                else
+                {
+                    <p>No avatar yet</p>
+                }
+            </div>
+        </div>
+
+        <!-- Загрузка нового аватара -->
+        <div class="new-photos">
+            <div class="upload-container">
+                <div class="drop-area" id="avatarDropArea">
+                    <div id="avatarPreview" class="preview-grid"></div>
+                    <div class="drop-content">
+                        <span class="upload-icon">📷</span>
+                        <p class="drop-text">Drag & Drop avatar here</p>
+                        <p class="drop-text">or</p>
+                        <label for="avatarUpload" class="browse-btn">📁 Browse File</label>
+                        <input type="file" hidden id="avatarUpload" asp-for="ProfileImageFile" multiple accept="image/*" />
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- Username -->
@@ -53,3 +82,110 @@
         </div>
     }
 </div>
+
+<script>
+        document.addEventListener('DOMContentLoaded', function () {
+        const dropArea = document.getElementById('avatarDropArea');
+        const fileInput = document.getElementById('avatarUpload');
+        const previewContainer = document.getElementById('avatarPreview');
+
+        if (!dropArea || !fileInput || !previewContainer) {
+            console.error("Avatar elements not found");
+            return;
+        }
+
+        let selectedFile = null; // только один файл
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        function highlight() {
+            dropArea.classList.add('highlight');
+        }
+
+        function unhighlight() {
+            dropArea.classList.remove('highlight');
+        }
+
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            handleFile(files[0]);
+        }
+
+        function handleFile(file) {
+            if (!file || !file.type.match('image.*')) return;
+
+            selectedFile = file;
+            const reader = new FileReader();
+
+            reader.onload = function (e) {
+                previewContainer.innerHTML = `
+                    <div class="preview-item">
+                        <img src="${e.target.result}" alt="Avatar preview" />
+                        <button class="delete-photo-btn" type="button">🗙</button>
+                    </div>
+                `;
+
+                const removeBtn = previewContainer.querySelector('.delete-photo-btn');
+                removeBtn.addEventListener('click', () => {
+                    selectedFile = null;
+                    previewContainer.innerHTML = "";
+                    updateFileInput();
+                    toggleDropContentVisibility();
+                });
+
+                updateFileInput();
+                toggleDropContentVisibility();
+            };
+
+            reader.readAsDataURL(file);
+        }
+
+        function updateFileInput() {
+            const dataTransfer = new DataTransfer();
+            if (selectedFile) {
+                dataTransfer.items.add(selectedFile);
+            }
+            fileInput.files = dataTransfer.files;
+        }
+
+        function toggleDropContentVisibility() {
+            if (selectedFile) {
+                dropArea.classList.add('has-files');
+            } else {
+                dropArea.classList.remove('has-files');
+            }
+        }
+
+        // drag&drop события
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropArea.addEventListener(eventName, preventDefaults, false);
+        });
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropArea.addEventListener(eventName, highlight, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropArea.addEventListener(eventName, unhighlight, false);
+        });
+
+        dropArea.addEventListener('drop', handleDrop, false);
+
+        fileInput.addEventListener('change', function (e) {
+            if (e.target.files && e.target.files[0]) {
+                handleFile(e.target.files[0]);
+            }
+        });
+
+        // Клик по зоне открывает диалог
+        dropArea.addEventListener('click', function (e) {
+            if (e.target === dropArea || e.target.classList.contains('drop-content')) {
+                fileInput.click();
+            }
+        });
+    });
+</script>

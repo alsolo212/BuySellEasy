@@ -18,7 +18,7 @@ namespace Infrastructure.Repository
         {
             return await _context.CartItems
                 .Include(ci => ci.Product)
-                .ThenInclude(p => p.Images)
+                .ThenInclude(product => product!.Images)
                 .Where(ci => ci.UserId == userId)
                 .ToListAsync();
         }

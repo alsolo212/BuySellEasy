@@ -68,3 +68,8 @@ _ReSharper*/
 *.old
 *.orig
 *.Backup*/
+
+# Local user-uploaded files
+Api/wwwroot/uploads/
+UI/wwwroot/uploads/avatars/
+UI/wwwroot/uploads/product-photos/

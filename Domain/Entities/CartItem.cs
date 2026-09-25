@@ -1,18 +1,29 @@
-﻿using Domain.Abstractions;
+using Domain.Abstractions;
 using Domain.IdentityEntities;
+using System.ComponentModel.DataAnnotations;
 
 namespace Domain.Entities
 {
     public class CartItem : IHasId
     {
-        public Guid Id { get; set; }
+        [Key]
+        public Guid Id { get; set; } = Guid.NewGuid();
 
-        // FK на пользователя
         public Guid UserId { get; set; }
         public User? User { get; set; }
 
-        // FK на продукт
-        public Guid ProductId { get; set; }
-        public Product Product { get; set; } = null!;
+        // Legacy MVC cart relation. Keep nullable for safe migration.
+        public Guid? ProductId { get; set; }
+        public Product? Product { get; set; }
+
+        public Guid? ListingId { get; set; }
+        public Listing? Listing { get; set; }
+
+        public bool IsSelected { get; set; } = true;
+
+        [Range(1, int.MaxValue)]
+        public int Quantity { get; set; } = 1;
+
+        public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
     }
 }

@@ -879,13 +879,15 @@ select {
 }
 
 /*FILTERS*/
-.filters-container {
+.filters-container,
+.profile-filters-container {
     position: relative;
     margin-bottom: 20px;
     max-height: 42px;
 }
 
-.search-form {
+.search-form,
+.profile-search-form {
     display: flex;
     align-items: center;
     gap: 10px;
@@ -894,7 +896,10 @@ select {
 
 .search-btn,
 .filter-toggle,
-.sort-toggle {
+.sort-toggle,
+.profile-search-btn,
+.profile-filter-toggle,
+.profile-sort-toggle {
     flex-shrink: 0;
     width: 42px;
     margin-top: 10px;
@@ -913,20 +918,27 @@ select {
 
     .search-btn:hover,
     .filter-toggle:hover,
-    .sort-toggle:hover {
+    .sort-toggle:hover,
+    .profile-search-btn:hover,
+    .profile-filter-toggle:hover,
+    .profile-sort-toggle:hover {
         background-color: #f0f0f0;
     }
 
     .search-btn img,
     .filter-toggle img,
-    .sort-toggle img {
+    .sort-toggle img,
+    .profile-search-btn img,
+    .profile-filter-toggle img,
+    .profile-sort-toggle img {
         width: 20px;
         height: 20px;
         filter: brightness(0); /* делает иконку чёрной */
     }
 
 /* Выпадающие меню */
-.dropdown-menu {
+.dropdown-menu,
+.profile-dropdown-menu {
     position: absolute;
     top: 50px;
     right: 0;
@@ -943,10 +955,11 @@ select {
 }
 
 /* Используем big-btn вместо apply-btn */
-.dropdown-menu .big-btn {
-    font-size: 14px;
-    padding: 10px;
-}
+    .dropdown-menu .big-btn,
+    .profile-dropdown-menu .big-btn {
+        font-size: 14px;
+        padding: 10px;
+    }
 
 /*CATEGORY*/
 .categories-container {
