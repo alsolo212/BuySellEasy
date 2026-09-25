@@ -20,6 +20,7 @@ namespace UI.Controllers
         private readonly IProductService _productService;
         private readonly ICategoriesService _categoriesService;
         private readonly ICartService _cartService;
+        private readonly IUserAvatarService _avatarService;
 
         public AccountController(
             ICartService cartService,
@@ -27,7 +28,8 @@ namespace UI.Controllers
             ICategoriesService categoriesService,
             UserManager<User> userManager,
             SignInManager<User> signInManager,
-            RoleManager<Role> roleManager)
+            RoleManager<Role> roleManager,
+            IUserAvatarService avatarService)
         {
             _cartService = cartService;
             _productService = productService;
@@ -35,6 +37,7 @@ namespace UI.Controllers
             _userManager = userManager;
             _signInManager = signInManager;
             _roleManager = roleManager;
+            _avatarService = avatarService;
         }
 
         [Route("auth")]
@@ -116,7 +119,8 @@ namespace UI.Controllers
             var model = new HomeViewModel
             {
                 Categories = await _categoriesService.GetCategories(),
-                Products = await _productService.GetProducts(filters)
+                Products = await _productService.GetProducts(filters),
+                ProfileImageUrl = user?.ProfileImageUrl
             };
 
             return View(model);
@@ -185,18 +189,23 @@ namespace UI.Controllers
             user.UserName = dto.UserName;
             user.Email = dto.Email;
             user.PhoneNumber = dto.Phone;
-            user.ProfileImageUrl = dto.ProfileImageUrl;
             user.IsVerified = dto.IsVerified;
 
-            var result = await _userManager.UpdateAsync(user);
+            // загружаем новый аватар, если он выбран
+            if (dto.ProfileImageFile != null)
+            {
+                var avatarUrl = await _avatarService.UploadAvatarAsync(user.Id, dto.ProfileImageFile);
+                if (avatarUrl != null)
+                    user.ProfileImageUrl = avatarUrl;
+            }
 
+            var result = await _userManager.UpdateAsync(user);
             if (!result.Succeeded)
             {
                 foreach (var error in result.Errors)
-                {
                     ModelState.AddModelError("", error.Description);
-                }
-                return View(user);
+
+                return View(dto);
             }
 
             var requiredRole = dto.IsAdmin ? IdentitySeed.Admin : IdentitySeed.User;
@@ -209,7 +218,7 @@ namespace UI.Controllers
             {
                 return RedirectToAction("Profile");
             }
-            if (dto.IsAdmin&& !isAdmin)
+            if (dto.IsAdmin && !isAdmin)
             {
                 await _userManager.AddToRoleAsync(user, IdentitySeed.Admin);
             }
@@ -226,7 +235,10 @@ namespace UI.Controllers
                 await _userManager.RemoveFromRoleAsync(user, IdentitySeed.Admin);
             }
 
-            return RedirectToAction("Users");
+            if (User.IsInRole(IdentitySeed.Admin))
+                return RedirectToAction("Users");
+            else
+                return RedirectToAction("Profile");
         }
 
         [HttpPost]

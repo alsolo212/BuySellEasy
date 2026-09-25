@@ -78,8 +78,7 @@ namespace Application.Services
             if (product != null && product.Images != null)
             {
                 product.Images = product.Images
-                    .Where(img => File.Exists(GetImagePhysicalPath(img.ImagePath)))
-                    .OrderBy(img => img.SortOrder) // <- Сортировка здесь!
+                    .OrderBy(img => img.SortOrder)
                     .ToList();
             }
             return product;

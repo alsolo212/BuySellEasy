@@ -1,4 +1,5 @@
 ﻿using Domain.Enums;
+using Microsoft.AspNetCore.Http;
 using System.ComponentModel.DataAnnotations;
 
 
@@ -8,6 +9,9 @@ namespace Application.DTO.IdentityDto
     {
         public Guid Id { get; set; }
         public string? ProfileImageUrl { get; set; }
+
+        [Display(Name = "Upload Avatar")]
+        public IFormFile? ProfileImageFile { get; set; }
 
         [Required(ErrorMessage = "Username is required")]
         public string UserName { get; set; } = string.Empty;

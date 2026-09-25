@@ -11,7 +11,12 @@
         {
             var user = item.user;
             <div class="user-card">
-                <div class="user-avatar"></div>
+                <div class="user-avatar">
+                    @if (!string.IsNullOrEmpty(@user.ProfileImageUrl))
+                    {
+                        <img src="@user.ProfileImageUrl" alt="avatar" style="width:80px; height:80px; border-radius: 8px;" />
+                    }
+                </div>
 
                 <div class="user-info">
                     <p class="user-name">@user.UserName</p>
@@ -35,7 +40,12 @@
         {
             var user = item.user;
             <div class="user-card">
-                <div class="user-avatar"></div>
+                <div class="user-avatar">
+                    @if (!string.IsNullOrEmpty(@user.ProfileImageUrl))
+                    {
+                        <img src="@user.ProfileImageUrl" alt="avatar" style="width:80px; height:80px; border-radius: 8px;" />
+                    }
+                </div>
 
                 <div class="user-info">
                     <p class="user-name">@user.UserName</p>

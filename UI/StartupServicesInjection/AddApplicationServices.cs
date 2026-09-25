@@ -39,7 +39,7 @@ namespace UI.StartupServicesInjection
             // БД
             services.AddDbContext<ProductDbContext>(options =>
             {
-                options.UseSqlServer(configuration.GetConnectionString("DefaultConnection"));
+                options.UseNpgsql(configuration.GetConnectionString("DefaultConnection"));
             });
 
             // Репозитории и сервисы
@@ -52,7 +52,8 @@ namespace UI.StartupServicesInjection
             services.AddScoped<ICartItemRepository, CartItemRepository>();
             services.AddScoped<ICartService, CartService>();
             services.AddScoped<IGenericRepository<Product>, GenericRepository<Product>>();
-
+            services.AddScoped<IUserAvatarService, UserAvatarService>();
+            services.AddScoped<IUserRepository, UserRepository>();
 
             // HttpContext и Session
             services.AddHttpContextAccessor();

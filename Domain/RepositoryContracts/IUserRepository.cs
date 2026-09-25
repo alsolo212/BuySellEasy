@@ -1,12 +1,11 @@
-﻿/*using Domain.Entities;
+﻿using Domain.IdentityEntities;
 
 namespace Domain.RepositoryContracts
 {
     public interface IUserRepository
     {
-        public List<User> GetUsers();
-        void AddUser(User user);
-        User? GetUserByEmailAndPassword(string email, string password);
+        Task<User?> GetByIdAsync(Guid id);
+        void Update(User user);
+        Task SaveAsync();
     }
 }
-*/
