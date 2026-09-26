@@ -3,6 +3,7 @@ using Api.Extensions;
 using Api.Hubs;
 using Api.Middleware;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.FileProviders;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -31,7 +32,21 @@ app.UseAuthentication();
 app.UseMiddleware<BlockedUserMiddleware>();
 app.UseAuthorization();
 app.UseStaticFiles();
-app.UseLegacyUploads();
+
+// Keep existing category image URLs working after removing the MVC host.
+var categoryImagesPath = Path.Combine(
+    app.Environment.WebRootPath ?? Path.Combine(app.Environment.ContentRootPath, "wwwroot"),
+    "category-photos");
+
+if (Directory.Exists(categoryImagesPath))
+{
+    app.UseStaticFiles(new StaticFileOptions
+    {
+        FileProvider = new PhysicalFileProvider(categoryImagesPath),
+        RequestPath = "/uploads/category-photos"
+    });
+}
+
 app.MapControllers();
 app.MapHub<ChatHub>("/hubs/chat");
 

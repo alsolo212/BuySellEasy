@@ -241,28 +241,18 @@ namespace Infrastructure.DbContextt
 
         private static string? FindCategoriesJsonPath()
         {
-            var foldersToCheck = new List<string>
+            var pathsToCheck = new List<string>
             {
-                AppContext.BaseDirectory,
-                Directory.GetCurrentDirectory()
+                Path.Combine(AppContext.BaseDirectory, "categories.json"),
+                Path.Combine(Directory.GetCurrentDirectory(), "categories.json"),
+                Path.Combine(Directory.GetCurrentDirectory(), "Api", "categories.json")
             };
 
-            var current = new DirectoryInfo(AppContext.BaseDirectory);
-
-            while (current is not null)
+            foreach (var path in pathsToCheck.Distinct())
             {
-                foldersToCheck.Add(current.FullName);
-                foldersToCheck.Add(Path.Combine(current.FullName, "UI"));
-                foldersToCheck.Add(Path.Combine(current.FullName, "Api"));
-                current = current.Parent;
-            }
-
-            foreach (var folder in foldersToCheck.Distinct())
-            {
-                var candidate = Path.Combine(folder, "categories.json");
-                if (File.Exists(candidate))
+                if (File.Exists(path))
                 {
-                    return candidate;
+                    return path;
                 }
             }
 
