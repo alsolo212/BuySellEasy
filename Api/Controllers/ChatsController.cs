@@ -541,6 +541,8 @@ public class ChatsController : ControllerBase
             "живой человек",
             "нужен человек",
             "call an operator",
+            "connect to an operator",
+            "connect me to an operator",
             "human agent",
             "real person",
             "talk to an admin",
