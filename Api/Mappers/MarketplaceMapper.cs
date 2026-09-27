@@ -239,9 +239,12 @@ public static class MarketplaceMapper
                 : counterparty.ProfileImageUrl,
             IsSellerView = chat.SellerId == currentUserId,
             IsSupport = chat.IsSupport,
+            SupportStatus = chat.SupportStatus,
             AssignedAdminId = chat.AssignedAdminId,
             AssignedAdminName = chat.AssignedAdmin?.UserName,
-            IsBusy = chat.IsSupport && chat.AssignedAdminId.HasValue,
+            IsBusy = chat.IsSupport &&
+                     chat.AssignedAdminId.HasValue &&
+                     chat.SupportStatus == Domain.Enums.SupportChatStatus.AdminActive,
             IsAssignedToCurrentAdmin = chat.IsSupport && chat.AssignedAdminId == currentUserId,
             UnreadCount = unreadCount,
             LastMessagePreview = lastMessagePreview,

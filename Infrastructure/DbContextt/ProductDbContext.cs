@@ -1,4 +1,5 @@
 ﻿using Domain.Entities;
+using Domain.Enums;
 using Domain.IdentityEntities;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -34,6 +35,10 @@ namespace Infrastructure.DbContextt
             modelBuilder.Entity<Order>().ToTable("Orders");
             modelBuilder.Entity<Shipment>().ToTable("Shipments");
             modelBuilder.Entity<Chat>().ToTable("Chats");
+            modelBuilder.Entity<Chat>()
+                .Property(chat => chat.SupportStatus)
+                .HasSentinel(SupportChatStatus.BotActive)
+                .HasDefaultValue(SupportChatStatus.BotActive);
             modelBuilder.Entity<Message>().ToTable("Messages");
             modelBuilder.Entity<Review>().ToTable("Reviews");
             modelBuilder.Entity<ListingReport>().ToTable("ListingReports");

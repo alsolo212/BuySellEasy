@@ -1,4 +1,5 @@
 using Domain.Abstractions;
+using Domain.Enums;
 using Domain.IdentityEntities;
 using System.ComponentModel.DataAnnotations;
 
@@ -16,6 +17,8 @@ namespace Domain.Entities
         public Guid SellerId { get; set; }
 
         public bool IsSupport { get; set; }
+
+        public SupportChatStatus SupportStatus { get; set; } = SupportChatStatus.BotActive;
 
         public Guid? AssignedAdminId { get; set; }
 

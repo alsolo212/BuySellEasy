@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.Extensions.Options;
 using System.Text.Json.Serialization;
 
 namespace Api.Extensions;
@@ -21,6 +22,7 @@ public static class ApiServiceCollectionExtensions
     public static IServiceCollection AddApiServices(this IServiceCollection services, IConfiguration configuration)
     {
         services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
+        services.Configure<SupportBotOptions>(configuration.GetSection(SupportBotOptions.SectionName));
 
         services
             .AddControllers()
@@ -130,6 +132,11 @@ public static class ApiServiceCollectionExtensions
         services.AddHttpContextAccessor();
 
         services.AddScoped<IJwtTokenService, JwtTokenService>();
+        services.AddHttpClient<SupportBotService>((serviceProvider, client) =>
+        {
+            var options = serviceProvider.GetRequiredService<IOptions<SupportBotOptions>>().Value;
+            client.Timeout = TimeSpan.FromSeconds(Math.Clamp(options.TimeoutSeconds, 5, 300));
+        });
 
         return services;
     }

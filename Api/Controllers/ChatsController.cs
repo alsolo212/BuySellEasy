@@ -2,6 +2,7 @@ using Api.Contracts.Chats;
 using Api.Extensions;
 using Api.Hubs;
 using Api.Mappers;
+using Api.Services;
 using Domain.Entities;
 using Domain.Enums;
 using Infrastructure.DbContextt;
@@ -19,6 +20,7 @@ namespace Api.Controllers;
 public class ChatsController : ControllerBase
 {
     private const long MaxAttachmentSizeBytes = 10 * 1024 * 1024;
+    private static readonly TimeSpan AdminInactivityTimeout = TimeSpan.FromMinutes(20);
     private static readonly Dictionary<string, MessageType> AllowedAttachmentExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
         [".jpg"] = MessageType.Image,
@@ -35,15 +37,18 @@ public class ChatsController : ControllerBase
 
     private readonly ProductDbContext _dbContext;
     private readonly IHubContext<ChatHub> _hubContext;
+    private readonly SupportBotService _supportBot;
     private readonly IWebHostEnvironment _webHostEnvironment;
 
     public ChatsController(
         ProductDbContext dbContext,
         IHubContext<ChatHub> hubContext,
+        SupportBotService supportBot,
         IWebHostEnvironment webHostEnvironment)
     {
         _dbContext = dbContext;
         _hubContext = hubContext;
+        _supportBot = supportBot;
         _webHostEnvironment = webHostEnvironment;
     }
 
@@ -168,6 +173,7 @@ public class ChatsController : ControllerBase
             BuyerId = userId,
             SellerId = supportAccount.Id,
             IsSupport = true,
+            SupportStatus = SupportChatStatus.BotActive,
             CreatedAtUtc = DateTime.UtcNow,
             LastMessageAtUtc = DateTime.UtcNow
         };
@@ -184,6 +190,36 @@ public class ChatsController : ControllerBase
         {
             Chat = MarketplaceMapper.MapChatSummary(created, userId)
         });
+    }
+
+    [HttpPost("{id:guid}/request-admin")]
+    public async Task<ActionResult<ChatSummaryResponse>> RequestAdmin(Guid id, CancellationToken cancellationToken)
+    {
+        var userId = User.GetRequiredUserId();
+        var chat = await _dbContext.Chats
+            .Include(item => item.Listing)
+                .ThenInclude(listing => listing!.Images)
+            .Include(item => item.Buyer)
+            .Include(item => item.Seller)
+            .Include(item => item.AssignedAdmin)
+            .Include(item => item.Messages)
+            .FirstOrDefaultAsync(item => item.Id == id, cancellationToken)
+            ?? throw new KeyNotFoundException("Chat was not found.");
+
+        EnsureCanAccessChat(chat, userId);
+        if (!chat.IsSupport)
+        {
+            throw new InvalidOperationException("Only support chats can be escalated.");
+        }
+
+        if (chat.SupportStatus == SupportChatStatus.BotActive)
+        {
+            chat.SupportStatus = SupportChatStatus.NeedsAdmin;
+            await AddSupportBotMessageAsync(chat, SupportBotService.HandoffMessage, cancellationToken);
+            await BroadcastChatSummariesAsync(chat);
+        }
+
+        return Ok(MarketplaceMapper.MapChatSummary(chat, userId));
     }
 
     [HttpPost("{id:guid}/claim")]
@@ -210,19 +246,15 @@ public class ChatsController : ControllerBase
             throw new InvalidOperationException("Only support chats can be claimed.");
         }
 
-        if (User.IsSuperAdmin())
-        {
-            return Ok(MarketplaceMapper.MapChatSummary(chat, userId));
-        }
-
         if (chat.AssignedAdminId.HasValue && chat.AssignedAdminId != userId)
         {
             throw new InvalidOperationException("This support chat is already assigned to another admin.");
         }
 
-        if (chat.AssignedAdminId != userId)
+        if (chat.AssignedAdminId != userId || chat.SupportStatus != SupportChatStatus.AdminActive)
         {
             chat.AssignedAdminId = userId;
+            chat.SupportStatus = SupportChatStatus.AdminActive;
             await _dbContext.SaveChangesAsync();
             chat = await LoadChatAsync(chat.Id)
                 ?? throw new KeyNotFoundException("Chat was not found.");
@@ -272,7 +304,10 @@ public class ChatsController : ControllerBase
     }
 
     [HttpPost("{id:guid}/messages")]
-    public async Task<ActionResult<MessageResponse>> SendMessage(Guid id, [FromBody] SendMessageRequest request)
+    public async Task<ActionResult<MessageResponse>> SendMessage(
+        Guid id,
+        [FromBody] SendMessageRequest request,
+        CancellationToken cancellationToken)
     {
         var userId = User.GetRequiredUserId();
         var normalizedContent = request.Content?.Trim() ?? string.Empty;
@@ -307,7 +342,7 @@ public class ChatsController : ControllerBase
 
         _dbContext.Messages.Add(message);
         chat.LastMessageAtUtc = message.SentAtUtc;
-        await _dbContext.SaveChangesAsync();
+        await _dbContext.SaveChangesAsync(cancellationToken);
 
         var created = await _dbContext.Messages
             .AsNoTracking()
@@ -317,6 +352,7 @@ public class ChatsController : ControllerBase
 
         var response = MarketplaceMapper.MapMessage(created);
         await _hubContext.Clients.Group(ChatHub.BuildChatGroup(id)).SendAsync("MessageReceived", response);
+        await ProcessSupportMessageAsync(chat, userId, message, cancellationToken);
         await BroadcastChatSummariesAsync(chat);
 
         return Ok(response);
@@ -367,6 +403,154 @@ public class ChatsController : ControllerBase
         });
     }
 
+    private async Task ProcessSupportMessageAsync(
+        Chat chat,
+        Guid senderId,
+        Message message,
+        CancellationToken cancellationToken)
+    {
+        if (!chat.IsSupport || senderId != chat.BuyerId)
+        {
+            return;
+        }
+
+        if (ContainsAdminRequest(message.Content))
+        {
+            if (chat.SupportStatus == SupportChatStatus.BotActive)
+            {
+                await EscalateSupportChatAsync(chat, cancellationToken);
+            }
+
+            return;
+        }
+
+        if (chat.SupportStatus == SupportChatStatus.AdminActive &&
+            HasAdminBeenInactiveLongEnough(chat))
+        {
+            chat.SupportStatus = SupportChatStatus.BotActive;
+            chat.AssignedAdminId = null;
+        }
+
+        if (chat.SupportStatus != SupportChatStatus.BotActive)
+        {
+            return;
+        }
+
+        if (message.Type != MessageType.Text || !string.IsNullOrWhiteSpace(message.AttachmentUrl))
+        {
+            await AddSupportBotMessageAsync(chat, SupportBotService.TextOnlyMessage, cancellationToken);
+            return;
+        }
+
+        var history = await _dbContext.Messages
+            .AsNoTracking()
+            .Where(item => item.ChatId == chat.Id)
+            .OrderBy(item => item.SentAtUtc)
+            .Select(item => new SupportBotHistoryMessage(
+                item.SenderId == chat.BuyerId,
+                item.Content))
+            .ToArrayAsync(cancellationToken);
+
+        var reply = await _supportBot.GenerateReplyAsync(history, cancellationToken);
+        if (string.IsNullOrWhiteSpace(reply))
+        {
+            await AddSupportBotMessageAsync(chat, SupportBotService.UnavailableMessage, cancellationToken);
+            return;
+        }
+
+        if (reply.Contains(SupportBotService.HandoffMessage, StringComparison.OrdinalIgnoreCase))
+        {
+            reply = SupportBotService.OutOfScopeMessage;
+        }
+
+        await AddSupportBotMessageAsync(chat, reply, cancellationToken);
+    }
+
+    private static bool HasAdminBeenInactiveLongEnough(Chat chat)
+    {
+        if (!chat.AssignedAdminId.HasValue)
+        {
+            return false;
+        }
+
+        var lastAdminMessageAt = chat.Messages
+            .Where(message => message.SenderId == chat.AssignedAdminId.Value)
+            .OrderByDescending(message => message.SentAtUtc)
+            .Select(message => (DateTime?)message.SentAtUtc)
+            .FirstOrDefault();
+
+        return lastAdminMessageAt.HasValue &&
+               DateTime.UtcNow - lastAdminMessageAt.Value >= AdminInactivityTimeout;
+    }
+
+    private async Task EscalateSupportChatAsync(Chat chat, CancellationToken cancellationToken)
+    {
+        chat.SupportStatus = SupportChatStatus.NeedsAdmin;
+        await AddSupportBotMessageAsync(chat, SupportBotService.HandoffMessage, cancellationToken);
+    }
+
+    private async Task<MessageResponse> AddSupportBotMessageAsync(
+        Chat chat,
+        string content,
+        CancellationToken cancellationToken)
+    {
+        var message = new Message
+        {
+            ChatId = chat.Id,
+            SenderId = chat.SellerId,
+            Content = content,
+            Type = MessageType.Text,
+            SentAtUtc = DateTime.UtcNow,
+            Chat = chat
+        };
+
+        _dbContext.Messages.Add(message);
+        chat.LastMessageAtUtc = message.SentAtUtc;
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        var created = await _dbContext.Messages
+            .AsNoTracking()
+            .Include(item => item.Sender)
+            .FirstOrDefaultAsync(item => item.Id == message.Id, cancellationToken)
+            ?? throw new KeyNotFoundException("Support bot message was not found.");
+
+        var response = MarketplaceMapper.MapMessage(created);
+        await _hubContext.Clients.Group(ChatHub.BuildChatGroup(chat.Id))
+            .SendAsync("MessageReceived", response, cancellationToken);
+        return response;
+    }
+
+    private static bool ContainsAdminRequest(string content)
+    {
+        string[] triggers =
+        [
+            "позови человека",
+            "нужен оператор",
+            "позови оператора",
+            "подключи оператора",
+            "подключите оператора",
+            "свяжи с оператором",
+            "свяжите с оператором",
+            "хочу поговорить с оператором",
+            "хочу связаться с оператором",
+            "свяжи с админом",
+            "свяжи с администратором",
+            "подключи администратора",
+            "подключите администратора",
+            "хочу поговорить с администратором",
+            "живой человек",
+            "нужен человек",
+            "call an operator",
+            "human agent",
+            "real person",
+            "talk to an admin",
+            "потрібен оператор",
+            "покличте оператора"
+        ];
+
+        return triggers.Any(trigger => content.Contains(trigger, StringComparison.OrdinalIgnoreCase));
+    }
+
     private void EnsureCanAccessChat(Chat chat, Guid currentUserId)
     {
         if (chat.BuyerId != currentUserId && chat.SellerId != currentUserId && !User.IsElevatedAdmin())
@@ -377,7 +561,7 @@ public class ChatsController : ControllerBase
 
     private void EnsureSupportChatCanBeManaged(Chat chat, Guid currentUserId)
     {
-        if (!chat.IsSupport || !User.IsElevatedAdmin() || User.IsSuperAdmin())
+        if (!chat.IsSupport || !User.IsElevatedAdmin())
         {
             return;
         }
@@ -391,6 +575,8 @@ public class ChatsController : ControllerBase
         {
             chat.AssignedAdminId = currentUserId;
         }
+
+        chat.SupportStatus = SupportChatStatus.AdminActive;
     }
 
     private async Task<Chat?> LoadChatAsync(Guid chatId)

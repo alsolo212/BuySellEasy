@@ -1,3 +1,5 @@
+using Domain.Enums;
+
 namespace Api.Contracts.Chats;
 
 public class ChatSummaryResponse
@@ -19,6 +21,8 @@ public class ChatSummaryResponse
     public bool IsSellerView { get; init; }
 
     public bool IsSupport { get; init; }
+
+    public SupportChatStatus SupportStatus { get; init; }
 
     public Guid? AssignedAdminId { get; init; }
 
