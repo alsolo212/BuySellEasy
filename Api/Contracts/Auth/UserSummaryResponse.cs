@@ -11,4 +11,6 @@ public class UserSummaryResponse
     public required IReadOnlyCollection<string> Roles { get; init; }
 
     public string? ProfileImageUrl { get; init; }
+
+    public required bool HasPassword { get; init; }
 }

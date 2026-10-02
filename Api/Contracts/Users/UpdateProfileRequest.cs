@@ -20,7 +20,6 @@ public class UpdateProfileRequest
     [StringLength(2048)]
     public string? ProfileImageUrl { get; init; }
 
-    [Required]
     [StringLength(128)]
-    public string CurrentPassword { get; init; } = string.Empty;
+    public string? CurrentPassword { get; init; }
 }

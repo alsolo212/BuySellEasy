@@ -48,7 +48,8 @@ public class UsersController : ControllerBase
         var userId = User.GetRequiredUserId();
         var user = await _userManager.FindByIdAsync(userId.ToString()) ?? throw new KeyNotFoundException("User was not found.");
 
-        var passwordValid = await _userManager.CheckPasswordAsync(user, request.CurrentPassword);
+        var passwordValid = string.IsNullOrWhiteSpace(user.PasswordHash) ||
+            await _userManager.CheckPasswordAsync(user, request.CurrentPassword ?? string.Empty);
         if (!passwordValid)
         {
             return ValidationProblem(new ValidationProblemDetails(new Dictionary<string, string[]>
