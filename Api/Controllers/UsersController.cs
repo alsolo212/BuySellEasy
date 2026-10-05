@@ -58,9 +58,20 @@ public class UsersController : ControllerBase
             }));
         }
 
+        var canChangeEmail = User.IsElevatedAdmin();
+        var requestedEmail = request.Email.Trim();
+        if (!canChangeEmail && !string.Equals(user.Email, requestedEmail, StringComparison.OrdinalIgnoreCase))
+        {
+            ModelState.AddModelError(nameof(request.Email), "Only administrators can change an email address.");
+            return ValidationProblem(ModelState);
+        }
+
         var previousProfileImageUrl = user.ProfileImageUrl;
         user.UserName = request.UserName.Trim();
-        user.Email = request.Email.Trim();
+        if (canChangeEmail)
+        {
+            user.Email = requestedEmail;
+        }
         user.PhoneNumber = request.Phone?.Trim();
         user.ProfileImageUrl = string.IsNullOrWhiteSpace(request.ProfileImageUrl)
             ? null
