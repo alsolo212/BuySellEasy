@@ -1,12 +1,14 @@
 using Api.Contracts.Orders;
 using Api.Extensions;
 using Api.Mappers;
+using Api.Services;
 using Domain.Entities;
 using Domain.Enums;
 using Infrastructure.DbContextt;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using StripeException = Stripe.StripeException;
 
 namespace Api.Controllers;
 
@@ -16,10 +18,17 @@ namespace Api.Controllers;
 public class OrdersController : ControllerBase
 {
     private readonly ProductDbContext _dbContext;
+    private readonly OrderPaymentLifecycleService _lifecycle;
+    private readonly StripePaymentService _stripe;
 
-    public OrdersController(ProductDbContext dbContext)
+    public OrdersController(
+        ProductDbContext dbContext,
+        OrderPaymentLifecycleService lifecycle,
+        StripePaymentService stripe)
     {
         _dbContext = dbContext;
+        _lifecycle = lifecycle;
+        _stripe = stripe;
     }
 
     [HttpGet("mine")]
@@ -47,11 +56,10 @@ public class OrdersController : ControllerBase
     {
         var buyerId = User.GetRequiredUserId();
         var listing = await LoadListingForOrderAsync(request.ListingId);
-        ValidatePaymentDetails(request.PaymentMethod, request.CardNumber, request.CardExpiry, request.CardCvc);
+        EnsureCashOnDeliveryOnly(request.PaymentMethod);
         await EnsureCanPurchaseListingAsync(listing, buyerId, request.Quantity);
 
         var order = CreateOrderEntity(listing, buyerId, request);
-        await ApplyReservationStateAsync(listing, request.Quantity);
 
         _dbContext.Orders.Add(order);
         await _dbContext.SaveChangesAsync();
@@ -89,7 +97,7 @@ public class OrdersController : ControllerBase
             throw new InvalidOperationException("Choose at least one cart item for checkout.");
         }
 
-        ValidatePaymentDetails(request.PaymentMethod, request.CardNumber, request.CardExpiry, request.CardCvc);
+        EnsureCashOnDeliveryOnly(request.PaymentMethod);
 
         foreach (var cartItem in cartItems)
         {
@@ -102,7 +110,6 @@ public class OrdersController : ControllerBase
         foreach (var cartItem in cartItems)
         {
             createdOrders.Add(CreateOrderEntity(cartItem.Listing!, buyerId, request, cartItem.Quantity));
-            await ApplyReservationStateAsync(cartItem.Listing!, cartItem.Quantity);
         }
         _dbContext.Orders.AddRange(createdOrders);
         _dbContext.CartItems.RemoveRange(cartItems);
@@ -144,12 +151,29 @@ public class OrdersController : ControllerBase
         var order = await _dbContext.Orders
             .Include(item => item.Listing)
             .Include(item => item.Shipment)
+            .Include(item => item.Seller)
             .FirstOrDefaultAsync(item => item.Id == id)
             ?? throw new KeyNotFoundException("Order was not found.");
 
         if (order.SellerId != userId && !User.IsElevatedAdmin())
         {
             throw new UnauthorizedAccessException("You cannot manage this order.");
+        }
+
+        if (order.Status != OrderStatus.Pending)
+        {
+            throw new InvalidOperationException("This order is no longer awaiting a seller decision.");
+        }
+
+        if (request.Approve && order.PaymentMethod == PaymentMethod.Card &&
+            !await CanSellerReceiveTransfersAsync(order.Seller))
+        {
+            throw new InvalidOperationException("Connect your Stripe payout account before accepting a card order.");
+        }
+
+        if (request.Approve)
+        {
+            await EnsureAcceptedQuantityAvailableAsync(order);
         }
 
         order.Status = request.Approve ? OrderStatus.Accepted : OrderStatus.Declined;
@@ -162,8 +186,10 @@ public class OrdersController : ControllerBase
         }
 
         await _dbContext.SaveChangesAsync();
-        await RecalculateListingStatusAsync(order.Listing);
-        await _dbContext.SaveChangesAsync();
+        if (!request.Approve)
+        {
+            await _lifecycle.RefundAsync(order);
+        }
         await UpdateOwnerListingCountAsync(order.Listing.OwnerId);
 
         var updated = await LoadOrderAsync(order.Id);
@@ -177,6 +203,7 @@ public class OrdersController : ControllerBase
         var order = await _dbContext.Orders
             .Include(item => item.Listing)
             .Include(item => item.Shipment)
+            .Include(item => item.Seller)
             .FirstOrDefaultAsync(item => item.Id == id)
             ?? throw new KeyNotFoundException("Order was not found.");
 
@@ -185,7 +212,7 @@ public class OrdersController : ControllerBase
             throw new UnauthorizedAccessException("You cannot cancel this order.");
         }
 
-        if (order.Status is OrderStatus.Delivered or OrderStatus.Declined or OrderStatus.Cancelled)
+        if (order.Status is OrderStatus.Delivered or OrderStatus.Declined or OrderStatus.Cancelled or OrderStatus.Expired)
         {
             throw new InvalidOperationException("This order can no longer be cancelled.");
         }
@@ -200,8 +227,7 @@ public class OrdersController : ControllerBase
         }
 
         await _dbContext.SaveChangesAsync();
-        await RecalculateListingStatusAsync(order.Listing);
-        await _dbContext.SaveChangesAsync();
+        await _lifecycle.RefundAsync(order);
         await UpdateOwnerListingCountAsync(order.Listing.OwnerId);
 
         var updated = await LoadOrderAsync(order.Id);
@@ -215,20 +241,37 @@ public class OrdersController : ControllerBase
         var order = await _dbContext.Orders
             .Include(item => item.Listing)
             .Include(item => item.Shipment)
+            .Include(item => item.Seller)
             .FirstOrDefaultAsync(item => item.Id == id)
             ?? throw new KeyNotFoundException("Order was not found.");
 
-        if (order.SellerId != userId && order.BuyerId != userId && !User.IsElevatedAdmin())
+        if (order.SellerId != userId && !User.IsElevatedAdmin())
         {
             throw new UnauthorizedAccessException("You cannot update shipment for this order.");
         }
 
         var shipment = order.Shipment ?? throw new InvalidOperationException("Shipment record is missing.");
+        ValidateShipmentTransition(order, request.Status);
+
+        if (request.Status == ShipmentStatus.ReadyToShip &&
+            order.PaymentMethod == PaymentMethod.Card &&
+            !await CanSellerReceiveTransfersAsync(order.Seller))
+        {
+            throw new InvalidOperationException("Connect your Stripe payout account before confirming a card order.");
+        }
+
+        if (request.Status == ShipmentStatus.ReadyToShip)
+        {
+            await EnsureAcceptedQuantityAvailableAsync(order);
+        }
+
         shipment.Status = request.Status;
         shipment.SenderFirstName = request.SenderFirstName.Trim();
         shipment.SenderLastName = request.SenderLastName.Trim();
         shipment.SenderPhone = request.SenderPhone.Trim();
-        shipment.PayoutCardMasked = request.PayoutCardMasked.Trim();
+        shipment.PayoutCardMasked = order.PaymentMethod == PaymentMethod.CashOnDelivery
+            ? MaskCardNumber(request.PayoutCardMasked)
+            : string.Empty;
         shipment.UpdatedAtUtc = DateTime.UtcNow;
 
         switch (request.Status)
@@ -241,19 +284,42 @@ public class OrdersController : ControllerBase
                 shipment.ShippedAtUtc ??= DateTime.UtcNow;
                 break;
             case ShipmentStatus.Arrived:
-                order.Status = OrderStatus.Delivered;
+                order.Status = OrderStatus.ReadyForPickup;
+                order.ReadyForPickupAtUtc ??= DateTime.UtcNow;
                 shipment.ArrivedAtUtc ??= DateTime.UtcNow;
-                ApplyDeliveredListingState(order.Listing, order.Quantity);
-                break;
-            case ShipmentStatus.Cancelled:
-                order.Status = OrderStatus.Cancelled;
                 break;
         }
 
         order.UpdatedAtUtc = DateTime.UtcNow;
         await _dbContext.SaveChangesAsync();
-        await RecalculateListingStatusAsync(order.Listing);
-        await _dbContext.SaveChangesAsync();
+        await UpdateOwnerListingCountAsync(order.Listing.OwnerId);
+
+        var updated = await LoadOrderAsync(order.Id);
+        return Ok(MarketplaceMapper.MapOrderDetails(updated));
+    }
+
+    [HttpPatch("{id:guid}/confirm-receipt")]
+    public async Task<ActionResult<OrderDetailsResponse>> ConfirmReceipt(Guid id)
+    {
+        var userId = User.GetRequiredUserId();
+        var order = await _dbContext.Orders
+            .Include(item => item.Listing)
+            .Include(item => item.Seller)
+            .Include(item => item.Shipment)
+            .FirstOrDefaultAsync(item => item.Id == id)
+            ?? throw new KeyNotFoundException("Order was not found.");
+
+        if (order.BuyerId != userId && !User.IsElevatedAdmin())
+        {
+            throw new UnauthorizedAccessException("Only the buyer can confirm receipt.");
+        }
+
+        if (order.Status != OrderStatus.ReadyForPickup)
+        {
+            throw new InvalidOperationException("This order is not ready for pickup.");
+        }
+
+        await _lifecycle.MarkDeliveredAndTransferAsync(order);
         await UpdateOwnerListingCountAsync(order.Listing.OwnerId);
 
         var updated = await LoadOrderAsync(order.Id);
@@ -332,15 +398,7 @@ public class OrdersController : ControllerBase
             throw new InvalidOperationException("This listing is no longer available for purchase.");
         }
 
-        var reservedQuantity = await _dbContext.Orders
-            .Where(order =>
-            order.ListingId == listing.Id &&
-            order.Status != OrderStatus.Delivered &&
-            order.Status != OrderStatus.Declined &&
-            order.Status != OrderStatus.Cancelled)
-            .SumAsync(order => (int?)order.Quantity) ?? 0;
-
-        if (listing.Quantity - reservedQuantity < requestedQuantity)
+        if (listing.Quantity < requestedQuantity)
         {
             throw new InvalidOperationException("The requested quantity is no longer available.");
         }
@@ -359,8 +417,9 @@ public class OrdersController : ControllerBase
             BuyerId = buyerId,
             SellerId = listing.OwnerId,
             PaymentMethod = request.PaymentMethod,
+            PaymentState = PaymentState.NotApplicable,
             Quantity = request.Quantity,
-            PaymentCardMasked = MaskCardNumber(request.CardNumber),
+            PaymentCardMasked = null,
             TotalAmount = listing.Price * request.Quantity,
             ListingTitleSnapshot = listing.Title,
             ListingPrimaryImageUrlSnapshot = primaryImageUrl,
@@ -372,6 +431,7 @@ public class OrdersController : ControllerBase
             DeliveryCity = request.DeliveryCity.Trim(),
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow,
+            SellerDecisionDeadlineUtc = OrderPaymentLifecycleService.GetSellerDecisionDeadline(DateTime.UtcNow),
             Shipment = new Shipment
             {
                 RecipientFirstName = request.BuyerFirstName.Trim(),
@@ -401,9 +461,6 @@ public class OrdersController : ControllerBase
             ListingId = listing.Id,
             Quantity = quantity,
             PaymentMethod = request.PaymentMethod,
-            CardNumber = request.CardNumber,
-            CardExpiry = request.CardExpiry,
-            CardCvc = request.CardCvc,
             BuyerFirstName = request.BuyerFirstName,
             BuyerLastName = request.BuyerLastName,
             BuyerEmail = request.BuyerEmail,
@@ -413,109 +470,22 @@ public class OrdersController : ControllerBase
         });
     }
 
-    private static void ApplyDeliveredListingState(Listing listing, int soldQuantity)
+    private static void EnsureCashOnDeliveryOnly(PaymentMethod paymentMethod)
     {
-        if (listing.Quantity <= soldQuantity)
+        if (paymentMethod == PaymentMethod.CashOnDelivery)
         {
-            listing.Quantity = 0;
-            listing.Status = ListingStatus.Inactive;
             return;
         }
 
-        listing.Quantity -= soldQuantity;
-        listing.Status = ListingStatus.Published;
+        throw new InvalidOperationException("Card payments must be completed through the secure Stripe payment form.");
     }
 
-    private async Task ApplyReservationStateAsync(Listing listing, int requestedQuantity)
-    {
-        var reservedQuantity = await _dbContext.Orders
-            .Where(order =>
-                order.ListingId == listing.Id &&
-                order.Status != OrderStatus.Delivered &&
-                order.Status != OrderStatus.Declined &&
-                order.Status != OrderStatus.Cancelled)
-            .SumAsync(order => (int?)order.Quantity) ?? 0;
-
-        var remainingQuantity = listing.Quantity - reservedQuantity - requestedQuantity;
-        listing.Status = remainingQuantity <= 0 ? ListingStatus.ReadyToShip : ListingStatus.Published;
-    }
-
-    private async Task RecalculateListingStatusAsync(Listing listing)
-    {
-        if (listing.Status == ListingStatus.Blocked || listing.Status == ListingStatus.Archived)
-        {
-            return;
-        }
-
-        if (listing.Quantity <= 0)
-        {
-            listing.Status = ListingStatus.Inactive;
-            return;
-        }
-
-        var activeOrders = await _dbContext.Orders
-            .Where(order =>
-                order.ListingId == listing.Id &&
-                order.Status != OrderStatus.Delivered &&
-                order.Status != OrderStatus.Declined &&
-                order.Status != OrderStatus.Cancelled)
-            .ToListAsync();
-
-        if (activeOrders.Count == 0)
-        {
-            listing.Status = ListingStatus.Published;
-            return;
-        }
-
-        var reservedQuantity = activeOrders.Sum(order => order.Quantity);
-        if (listing.Quantity > reservedQuantity)
-        {
-            listing.Status = ListingStatus.Published;
-            return;
-        }
-
-        if (activeOrders.Any(order => order.Status == OrderStatus.Shipped))
-        {
-            listing.Status = ListingStatus.InDelivery;
-            return;
-        }
-
-        listing.Status = ListingStatus.ReadyToShip;
-    }
-
-    private static void ValidatePaymentDetails(PaymentMethod paymentMethod, string? cardNumber, string? cardExpiry, string? cardCvc)
-    {
-        if (paymentMethod != PaymentMethod.Card)
-        {
-            return;
-        }
-
-        var normalizedCardNumber = NormalizeDigits(cardNumber);
-        var normalizedCvc = NormalizeDigits(cardCvc);
-        var normalizedExpiry = cardExpiry?.Trim() ?? string.Empty;
-
-        if (normalizedCardNumber.Length < 12 || normalizedCardNumber.Length > 19)
-        {
-            throw new InvalidOperationException("Enter a valid card number.");
-        }
-
-        if (!System.Text.RegularExpressions.Regex.IsMatch(normalizedExpiry, "^(0[1-9]|1[0-2])/[0-9]{2}$"))
-        {
-            throw new InvalidOperationException("Enter card expiry in MM/YY format.");
-        }
-
-        if (normalizedCvc.Length is < 3 or > 4)
-        {
-            throw new InvalidOperationException("Enter a valid CVC.");
-        }
-    }
-
-    private static string? MaskCardNumber(string? cardNumber)
+    private static string MaskCardNumber(string? cardNumber)
     {
         var digits = NormalizeDigits(cardNumber);
         if (digits.Length < 4)
         {
-            return null;
+            return string.Empty;
         }
 
         return $"**** **** **** {digits[^4..]}";
@@ -524,6 +494,40 @@ public class OrdersController : ControllerBase
     private static string NormalizeDigits(string? value)
     {
         return new string((value ?? string.Empty).Where(char.IsDigit).ToArray());
+    }
+
+    private static void ValidateShipmentTransition(Order order, ShipmentStatus nextStatus)
+    {
+        var currentStatus = order.Shipment?.Status ?? ShipmentStatus.Pending;
+        var isValid = nextStatus switch
+        {
+            ShipmentStatus.ReadyToShip => currentStatus == ShipmentStatus.Pending && order.Status == OrderStatus.Pending,
+            ShipmentStatus.InDelivery => currentStatus == ShipmentStatus.ReadyToShip && order.Status == OrderStatus.Accepted,
+            ShipmentStatus.Arrived => currentStatus == ShipmentStatus.InDelivery && order.Status == OrderStatus.Shipped,
+            _ => false
+        };
+
+        if (!isValid)
+        {
+            throw new InvalidOperationException("Order status must move forward one step at a time.");
+        }
+    }
+
+    private async Task EnsureAcceptedQuantityAvailableAsync(Order order)
+    {
+        var acceptedQuantity = await _dbContext.Orders
+            .Where(item =>
+                item.ListingId == order.ListingId &&
+                item.Id != order.Id &&
+                (item.Status == OrderStatus.Accepted ||
+                 item.Status == OrderStatus.Shipped ||
+                 item.Status == OrderStatus.ReadyForPickup))
+            .SumAsync(item => (int?)item.Quantity) ?? 0;
+
+        if (acceptedQuantity + order.Quantity > order.Listing.Quantity)
+        {
+            throw new InvalidOperationException("The seller has already accepted the available quantity for this listing.");
+        }
     }
 
     private async Task UpdateOwnerListingCountAsync(Guid ownerId)
@@ -540,5 +544,18 @@ public class OrdersController : ControllerBase
 
         owner.ActiveListingsCount = activeListingsCount;
         await _dbContext.SaveChangesAsync();
+    }
+
+    private async Task<bool> CanSellerReceiveTransfersAsync(Domain.IdentityEntities.User seller)
+    {
+        try
+        {
+            return await _stripe.CanReceiveTransfersAsync(seller);
+        }
+        catch (StripeException exception)
+        {
+            var stripeMessage = exception.StripeError?.Message ?? exception.Message;
+            throw new InvalidOperationException($"Stripe Connect payout account is unavailable: {stripeMessage}");
+        }
     }
 }

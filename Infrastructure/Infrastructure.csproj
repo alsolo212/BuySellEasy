@@ -20,6 +20,7 @@
        MigrationsPostgres. -->
   <ItemGroup>
     <Compile Remove="Migrations\**\*.cs" />
+    <Compile Include="Migrations\ProductDbContextModelSnapshot.cs" />
   </ItemGroup>
 
 </Project>

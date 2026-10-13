@@ -16,6 +16,7 @@ namespace Infrastructure.DbContextt
         public DbSet<Listing> Listings { get; set; }
         public DbSet<ListingImage> ListingImages { get; set; }
         public DbSet<Order> Orders { get; set; }
+        public DbSet<PaymentSession> PaymentSessions { get; set; }
         public DbSet<Shipment> Shipments { get; set; }
         public DbSet<Chat> Chats { get; set; }
         public DbSet<Message> Messages { get; set; }
@@ -33,6 +34,7 @@ namespace Infrastructure.DbContextt
             modelBuilder.Entity<Listing>().ToTable("Listings");
             modelBuilder.Entity<ListingImage>().ToTable("ListingImages");
             modelBuilder.Entity<Order>().ToTable("Orders");
+            modelBuilder.Entity<PaymentSession>().ToTable("PaymentSessions");
             modelBuilder.Entity<Shipment>().ToTable("Shipments");
             modelBuilder.Entity<Chat>().ToTable("Chats");
             modelBuilder.Entity<Chat>()
@@ -146,6 +148,24 @@ namespace Infrastructure.DbContextt
             modelBuilder.Entity<Order>()
                 .Property(order => order.TotalAmount)
                 .HasPrecision(18, 2);
+
+            modelBuilder.Entity<Order>()
+                .Property(order => order.StripeFeeAmount)
+                .HasPrecision(18, 2);
+
+            modelBuilder.Entity<PaymentSession>()
+                .Property(session => session.TotalAmount)
+                .HasPrecision(18, 2);
+
+            modelBuilder.Entity<PaymentSession>()
+                .HasIndex(session => session.StripeCheckoutSessionId)
+                .IsUnique();
+
+            modelBuilder.Entity<User>()
+                .HasMany<PaymentSession>()
+                .WithOne(session => session.Buyer)
+                .HasForeignKey(session => session.BuyerId)
+                .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<User>()
                 .HasMany(user => user.PurchaseOrders)

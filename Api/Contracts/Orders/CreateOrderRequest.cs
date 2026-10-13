@@ -14,15 +14,6 @@ public class CreateOrderRequest
     [Required]
     public PaymentMethod PaymentMethod { get; init; }
 
-    [StringLength(32)]
-    public string? CardNumber { get; init; }
-
-    [StringLength(5)]
-    public string? CardExpiry { get; init; }
-
-    [StringLength(4)]
-    public string? CardCvc { get; init; }
-
     [Required]
     [StringLength(120)]
     public string BuyerFirstName { get; init; } = string.Empty;

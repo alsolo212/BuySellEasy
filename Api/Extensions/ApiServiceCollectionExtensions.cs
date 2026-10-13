@@ -24,6 +24,7 @@ public static class ApiServiceCollectionExtensions
         services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
         services.Configure<GoogleAuthOptions>(configuration.GetSection(GoogleAuthOptions.SectionName));
         services.Configure<SupportBotOptions>(configuration.GetSection(SupportBotOptions.SectionName));
+        services.Configure<StripeOptions>(configuration.GetSection(StripeOptions.SectionName));
 
         services
             .AddControllers()
@@ -133,6 +134,9 @@ public static class ApiServiceCollectionExtensions
         services.AddHttpContextAccessor();
 
         services.AddScoped<IJwtTokenService, JwtTokenService>();
+        services.AddScoped<StripePaymentService>();
+        services.AddScoped<OrderPaymentLifecycleService>();
+        services.AddHostedService<OrderLifecycleBackgroundService>();
         services.AddHttpClient<SupportBotService>((serviceProvider, client) =>
         {
             var options = serviceProvider.GetRequiredService<IOptions<SupportBotOptions>>().Value;

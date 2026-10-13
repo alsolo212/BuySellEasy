@@ -20,11 +20,33 @@ namespace Domain.Entities
 
         public PaymentMethod PaymentMethod { get; set; } = PaymentMethod.Card;
 
+        public PaymentState PaymentState { get; set; } = PaymentState.NotApplicable;
+
         [Range(1, int.MaxValue)]
         public int Quantity { get; set; } = 1;
 
         [Range(typeof(decimal), "0.01", "999999999")]
         public decimal TotalAmount { get; set; }
+
+        [Range(typeof(decimal), "0", "999999999")]
+        public decimal StripeFeeAmount { get; set; }
+
+        public bool StripeFeeCalculated { get; set; }
+
+        [StringLength(128)]
+        public string? StripeCheckoutSessionId { get; set; }
+
+        [StringLength(128)]
+        public string? StripePaymentIntentId { get; set; }
+
+        [StringLength(128)]
+        public string? StripeConnectAccountId { get; set; }
+
+        [StringLength(128)]
+        public string? StripeTransferId { get; set; }
+
+        [StringLength(128)]
+        public string? StripeRefundId { get; set; }
 
         [StringLength(32)]
         public string? PaymentCardMasked { get; set; }
@@ -65,6 +87,12 @@ namespace Domain.Entities
         public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
 
         public DateTime UpdatedAtUtc { get; set; } = DateTime.UtcNow;
+
+        public DateTime SellerDecisionDeadlineUtc { get; set; }
+
+        public DateTime? ReadyForPickupAtUtc { get; set; }
+
+        public DateTime? DeliveredAtUtc { get; set; }
 
         public Listing Listing { get; set; } = null!;
 

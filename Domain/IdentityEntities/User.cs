@@ -1,5 +1,6 @@
 ﻿using Domain.Entities;
 using Microsoft.AspNetCore.Identity;
+using System.ComponentModel.DataAnnotations;
 
 namespace Domain.IdentityEntities
 {
@@ -16,6 +17,12 @@ namespace Domain.IdentityEntities
         public bool IsBlocked { get; set; }
 
         public int ActiveListingsCount { get; set; }
+
+        [StringLength(128)]
+        public string? StripeCustomerId { get; set; }
+
+        [StringLength(128)]
+        public string? StripeConnectAccountId { get; set; }
 
         public ICollection<Product> Products { get; set; } = new List<Product>();
         public ICollection<CartItem> CartItems { get; set; } = new List<CartItem>();

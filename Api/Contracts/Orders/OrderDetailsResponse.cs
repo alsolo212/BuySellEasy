@@ -12,6 +12,8 @@ public class OrderDetailsResponse
 
     public PaymentMethod PaymentMethod { get; init; }
 
+    public PaymentState PaymentState { get; init; }
+
     public int Quantity { get; init; }
 
     public string? PaymentCardMasked { get; init; }
@@ -33,6 +35,10 @@ public class OrderDetailsResponse
     public DateTime CreatedAtUtc { get; init; }
 
     public DateTime UpdatedAtUtc { get; init; }
+
+    public DateTime SellerDecisionDeadlineUtc { get; init; }
+
+    public DateTime? ReadyForPickupAtUtc { get; init; }
 
     public required ListingSummaryResponse Listing { get; init; }
 

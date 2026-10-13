@@ -82,55 +82,55 @@ namespace Infrastructure.MigrationsPostgres
                         new
                         {
                             Id = new Guid("11111111-1111-1111-1111-111111111111"),
-                            ImageUrl = "/uploads/category-photos/job.jpg",
+                            ImageUrl = "/category-photos/job.jpg",
                             Name = "Job"
                         },
                         new
                         {
                             Id = new Guid("22222222-2222-2222-2222-222222222222"),
-                            ImageUrl = "/uploads/category-photos/real_estate.jpg",
+                            ImageUrl = "/category-photos/real_estate.jpg",
                             Name = "Real estate"
                         },
                         new
                         {
                             Id = new Guid("33333333-3333-3333-3333-333333333333"),
-                            ImageUrl = "/uploads/category-photos/cars.jpg",
+                            ImageUrl = "/category-photos/cars.jpg",
                             Name = "Cars"
                         },
                         new
                         {
                             Id = new Guid("44444444-4444-4444-4444-444444444444"),
-                            ImageUrl = "/uploads/category-photos/electronics.jpg",
+                            ImageUrl = "/category-photos/electronics.jpg",
                             Name = "Electronics"
                         },
                         new
                         {
                             Id = new Guid("55555555-5555-5555-5555-555555555555"),
-                            ImageUrl = "/uploads/category-photos/sport.jpg",
+                            ImageUrl = "/category-photos/sport.jpg",
                             Name = "Sport"
                         },
                         new
                         {
                             Id = new Guid("66666666-6666-6666-6666-666666666666"),
-                            ImageUrl = "/uploads/category-photos/clothes.jpg",
+                            ImageUrl = "/category-photos/clothes.jpg",
                             Name = "Clothes"
                         },
                         new
                         {
                             Id = new Guid("77777777-7777-7777-7777-777777777777"),
-                            ImageUrl = "/uploads/category-photos/spare_parts.jpg",
+                            ImageUrl = "/category-photos/spare_parts.jpg",
                             Name = "Spare Parts"
                         },
                         new
                         {
                             Id = new Guid("88888888-8888-8888-8888-888888888888"),
-                            ImageUrl = "/uploads/category-photos/toys.jpg",
+                            ImageUrl = "/category-photos/toys.jpg",
                             Name = "Toys"
                         },
                         new
                         {
                             Id = new Guid("99999999-9999-9999-9999-999999999999"),
-                            ImageUrl = "/uploads/category-photos/pets.jpg",
+                            ImageUrl = "/category-photos/pets.jpg",
                             Name = "Pets"
                         });
                 });
@@ -161,6 +161,11 @@ namespace Infrastructure.MigrationsPostgres
 
                     b.Property<Guid>("SellerId")
                         .HasColumnType("uuid");
+
+                    b.Property<int>("SupportStatus")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
 
                     b.HasKey("Id");
 
@@ -371,6 +376,9 @@ namespace Infrastructure.MigrationsPostgres
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateTime?>("DeliveredAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("DeliveryAddress")
                         .IsRequired()
                         .HasMaxLength(512)
@@ -400,14 +408,50 @@ namespace Infrastructure.MigrationsPostgres
                     b.Property<int>("PaymentMethod")
                         .HasColumnType("integer");
 
+                    b.Property<int>("PaymentState")
+                        .HasColumnType("integer");
+
                     b.Property<int>("Quantity")
                         .HasColumnType("integer");
+
+                    b.Property<DateTime?>("ReadyForPickupAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("SellerDecisionDeadlineUtc")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid>("SellerId")
                         .HasColumnType("uuid");
 
                     b.Property<int>("Status")
                         .HasColumnType("integer");
+
+                    b.Property<string>("StripeCheckoutSessionId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("StripeConnectAccountId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<decimal>("StripeFeeAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<bool>("StripeFeeCalculated")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("StripePaymentIntentId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("StripeRefundId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("StripeTransferId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
 
                     b.Property<decimal>("TotalAmount")
                         .HasPrecision(18, 2)
@@ -425,6 +469,54 @@ namespace Infrastructure.MigrationsPostgres
                     b.HasIndex("SellerId");
 
                     b.ToTable("Orders", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.Entities.PaymentSession", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("BuyerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DraftJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("ProcessedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("StripeCheckoutSessionId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("StripePaymentIntentId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<decimal>("TotalAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BuyerId");
+
+                    b.HasIndex("StripeCheckoutSessionId")
+                        .IsUnique();
+
+                    b.ToTable("PaymentSessions", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Entities.Product", b =>
@@ -707,6 +799,14 @@ namespace Infrastructure.MigrationsPostgres
                     b.Property<string>("SecurityStamp")
                         .HasColumnType("text");
 
+                    b.Property<string>("StripeConnectAccountId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("StripeCustomerId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
                     b.Property<bool>("TwoFactorEnabled")
                         .HasColumnType("boolean");
 
@@ -987,6 +1087,17 @@ namespace Infrastructure.MigrationsPostgres
                     b.Navigation("Listing");
 
                     b.Navigation("Seller");
+                });
+
+            modelBuilder.Entity("Domain.Entities.PaymentSession", b =>
+                {
+                    b.HasOne("Domain.IdentityEntities.User", "Buyer")
+                        .WithMany()
+                        .HasForeignKey("BuyerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Buyer");
                 });
 
             modelBuilder.Entity("Domain.Entities.Product", b =>

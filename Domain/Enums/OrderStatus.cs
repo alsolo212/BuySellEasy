@@ -7,6 +7,8 @@ namespace Domain.Enums
         Declined = 3,
         Cancelled = 4,
         Shipped = 5,
-        Delivered = 6
+        Delivered = 6,
+        ReadyForPickup = 7,
+        Expired = 8
     }
 }
