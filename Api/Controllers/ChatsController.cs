@@ -60,27 +60,50 @@ public class ChatsController : ControllerBase
         var currentUserId = User.GetRequiredUserId();
         var targetUserId = userId.HasValue && User.IsElevatedAdmin() ? userId.Value : currentUserId;
         var isViewingAnotherUsersChats = targetUserId != currentUserId;
-        var chats = await _dbContext.Chats
+        IQueryable<Chat> chatsQuery = _dbContext.Chats
             .AsNoTracking()
             .Include(chat => chat.Listing)
                 .ThenInclude(listing => listing!.Images)
             .Include(chat => chat.Buyer)
             .Include(chat => chat.Seller)
             .Include(chat => chat.AssignedAdmin)
-            .Include(chat => chat.Messages)
-            .Where(chat => supportOnly
-                ? chat.IsSupport
-                : isViewingAnotherUsersChats
-                    ? chat.BuyerId == targetUserId || chat.SellerId == targetUserId
-                    : User.IsSuperAdmin()
-                        ? chat.BuyerId == targetUserId || chat.SellerId == targetUserId || chat.IsSupport
-                        : User.IsElevatedAdmin()
-                            ? chat.BuyerId == targetUserId ||
-                              chat.SellerId == targetUserId ||
-                              (chat.IsSupport &&
-                               (chat.AssignedAdminId == currentUserId ||
-                                chat.Messages.Any(message => message.SenderId == currentUserId)))
-                            : chat.BuyerId == targetUserId || chat.SellerId == targetUserId)
+            .Include(chat => chat.Messages);
+
+        if (supportOnly)
+        {
+            // The supportOnly flag is a view filter, not an authorization bypass.
+            // Regular users may only see their own support chat; support staff may
+            // see the support inbox so that they can claim and handle chats.
+            chatsQuery = User.IsElevatedAdmin()
+                ? chatsQuery.Where(chat => chat.IsSupport)
+                : chatsQuery.Where(chat => chat.IsSupport && chat.BuyerId == currentUserId);
+        }
+        else if (isViewingAnotherUsersChats)
+        {
+            chatsQuery = chatsQuery.Where(chat =>
+                chat.BuyerId == targetUserId || chat.SellerId == targetUserId);
+        }
+        else if (User.IsSuperAdmin())
+        {
+            chatsQuery = chatsQuery.Where(chat =>
+                chat.BuyerId == targetUserId || chat.SellerId == targetUserId || chat.IsSupport);
+        }
+        else if (User.IsElevatedAdmin())
+        {
+            chatsQuery = chatsQuery.Where(chat =>
+                chat.BuyerId == targetUserId ||
+                chat.SellerId == targetUserId ||
+                (chat.IsSupport &&
+                 (chat.AssignedAdminId == currentUserId ||
+                  chat.Messages.Any(message => message.SenderId == currentUserId))));
+        }
+        else
+        {
+            chatsQuery = chatsQuery.Where(chat =>
+                chat.BuyerId == targetUserId || chat.SellerId == targetUserId);
+        }
+
+        var chats = await chatsQuery
             .OrderByDescending(chat => chat.LastMessageAtUtc)
             .ToListAsync();
 
@@ -206,7 +229,11 @@ public class ChatsController : ControllerBase
             .FirstOrDefaultAsync(item => item.Id == id, cancellationToken)
             ?? throw new KeyNotFoundException("Chat was not found.");
 
-        EnsureCanAccessChat(chat, userId);
+        if (!CanAccessChat(chat, userId))
+        {
+            return Forbid();
+        }
+
         if (!chat.IsSupport)
         {
             throw new InvalidOperationException("Only support chats can be escalated.");
@@ -228,7 +255,7 @@ public class ChatsController : ControllerBase
         var userId = User.GetRequiredUserId();
         if (!User.IsElevatedAdmin())
         {
-            throw new UnauthorizedAccessException("Only admins can claim support chats.");
+            return Forbid();
         }
 
         var chat = await _dbContext.Chats
@@ -240,6 +267,11 @@ public class ChatsController : ControllerBase
             .Include(item => item.Messages)
             .FirstOrDefaultAsync(item => item.Id == id)
             ?? throw new KeyNotFoundException("Chat was not found.");
+
+        if (!CanAccessChat(chat, userId))
+        {
+            return Forbid();
+        }
 
         if (!chat.IsSupport)
         {
@@ -279,7 +311,10 @@ public class ChatsController : ControllerBase
             .FirstOrDefaultAsync(item => item.Id == id)
             ?? throw new KeyNotFoundException("Chat was not found.");
 
-        EnsureCanAccessChat(chat, userId);
+        if (!CanAccessChat(chat, userId))
+        {
+            return Forbid();
+        }
 
         var unreadIncomingMessages = chat.Messages
             .Where(message => message.SenderId != userId && message.ReadAtUtc is null)
@@ -327,8 +362,15 @@ public class ChatsController : ControllerBase
             .FirstOrDefaultAsync(item => item.Id == id)
             ?? throw new KeyNotFoundException("Chat was not found.");
 
-        EnsureCanAccessChat(chat, userId);
-        EnsureSupportChatCanBeManaged(chat, userId);
+        if (!CanAccessChat(chat, userId))
+        {
+            return Forbid();
+        }
+
+        if (!TryEnsureSupportChatCanBeManaged(chat, userId))
+        {
+            return Forbid();
+        }
 
         var message = new Message
         {
@@ -381,8 +423,15 @@ public class ChatsController : ControllerBase
         var chat = await _dbContext.Chats.FirstOrDefaultAsync(item => item.Id == id)
             ?? throw new KeyNotFoundException("Chat was not found.");
 
-        EnsureCanAccessChat(chat, userId);
-        EnsureSupportChatCanBeManaged(chat, userId);
+        if (!CanAccessChat(chat, userId))
+        {
+            return Forbid();
+        }
+
+        if (!TryEnsureSupportChatCanBeManaged(chat, userId))
+        {
+            return Forbid();
+        }
 
         var uploadsDirectory = Path.Combine(ResolveWebRootPath(), "uploads", "chats");
         Directory.CreateDirectory(uploadsDirectory);
@@ -553,24 +602,23 @@ public class ChatsController : ControllerBase
         return triggers.Any(trigger => content.Contains(trigger, StringComparison.OrdinalIgnoreCase));
     }
 
-    private void EnsureCanAccessChat(Chat chat, Guid currentUserId)
+    private bool CanAccessChat(Chat chat, Guid currentUserId)
     {
-        if (chat.BuyerId != currentUserId && chat.SellerId != currentUserId && !User.IsElevatedAdmin())
-        {
-            throw new UnauthorizedAccessException("You cannot access this chat.");
-        }
+        return chat.BuyerId == currentUserId ||
+               chat.SellerId == currentUserId ||
+               User.IsElevatedAdmin();
     }
 
-    private void EnsureSupportChatCanBeManaged(Chat chat, Guid currentUserId)
+    private bool TryEnsureSupportChatCanBeManaged(Chat chat, Guid currentUserId)
     {
         if (!chat.IsSupport || !User.IsElevatedAdmin())
         {
-            return;
+            return true;
         }
 
         if (chat.AssignedAdminId.HasValue && chat.AssignedAdminId != currentUserId)
         {
-            throw new UnauthorizedAccessException("This support chat is already assigned to another admin.");
+            return false;
         }
 
         if (!chat.AssignedAdminId.HasValue)
@@ -579,6 +627,7 @@ public class ChatsController : ControllerBase
         }
 
         chat.SupportStatus = SupportChatStatus.AdminActive;
+        return true;
     }
 
     private async Task<Chat?> LoadChatAsync(Guid chatId)
