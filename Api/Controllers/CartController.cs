@@ -1,6 +1,7 @@
 using Api.Contracts.Cart;
 using Api.Extensions;
 using Api.Mappers;
+using Api.Services;
 using Domain.Entities;
 using Domain.Enums;
 using Infrastructure.DbContextt;
@@ -51,7 +52,9 @@ public class CartController : ControllerBase
             {
                 UserId = userId,
                 ListingId = request.ListingId,
-                Quantity = Math.Min(request.Quantity, listing.Quantity),
+                Quantity = Math.Min(
+                    Math.Max(request.Quantity, 1),
+                    Math.Max(InventoryService.GetAvailableQuantity(listing.Quantity, listing.ReservedQuantity), 1)),
                 IsSelected = true,
                 CreatedAtUtc = DateTime.UtcNow
             });
@@ -59,7 +62,9 @@ public class CartController : ControllerBase
         else
         {
             existing.IsSelected = true;
-            existing.Quantity = Math.Min(Math.Max(request.Quantity, 1), listing.Quantity);
+            existing.Quantity = Math.Min(
+                Math.Max(request.Quantity, 1),
+                Math.Max(InventoryService.GetAvailableQuantity(listing.Quantity, listing.ReservedQuantity), 1));
         }
 
         await _dbContext.SaveChangesAsync();
@@ -78,7 +83,11 @@ public class CartController : ControllerBase
         cartItem.IsSelected = request.IsSelected;
         if (request.Quantity.HasValue)
         {
-            var availableQuantity = cartItem.Listing?.Quantity ?? 1;
+            var availableQuantity = cartItem.Listing is null
+                ? 1
+                : InventoryService.GetAvailableQuantity(
+                    cartItem.Listing.Quantity,
+                    cartItem.Listing.ReservedQuantity);
             cartItem.Quantity = Math.Min(Math.Max(request.Quantity.Value, 1), Math.Max(availableQuantity, 1));
         }
         await _dbContext.SaveChangesAsync();
@@ -130,12 +139,12 @@ public class CartController : ControllerBase
             throw new InvalidOperationException("You cannot add your own listing to the cart.");
         }
 
-        if (listing.Quantity < 1)
+        if (InventoryService.GetAvailableQuantity(listing.Quantity, listing.ReservedQuantity) < 1)
         {
             throw new InvalidOperationException("This listing is out of stock.");
         }
 
-        if (listing.Status is ListingStatus.Sold or ListingStatus.InDelivery or ListingStatus.Arrived or ListingStatus.Archived or ListingStatus.Inactive or ListingStatus.Blocked)
+        if (listing.Status is not (ListingStatus.Active or ListingStatus.Published))
         {
             throw new InvalidOperationException("This listing is not available for purchase.");
         }

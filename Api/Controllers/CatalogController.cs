@@ -4,6 +4,7 @@ using Domain.Enums;
 using Infrastructure.DbContextt;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 namespace Api.Controllers;
 
@@ -134,6 +135,29 @@ public class CatalogController : ControllerBase
             throw new KeyNotFoundException("Listing was not found.");
         }
 
+        if (!CanViewHiddenListing(listing))
+        {
+            throw new KeyNotFoundException("Listing was not found.");
+        }
+
         return Ok(MarketplaceMapper.MapListingDetails(listing));
+    }
+
+    private bool CanViewHiddenListing(Domain.Entities.Listing listing)
+    {
+        if (listing.Status is not (ListingStatus.Draft or ListingStatus.Blocked or ListingStatus.Inactive or ListingStatus.Archived))
+        {
+            return true;
+        }
+
+        if (User.IsInRole(Infrastructure.DbContextt.IdentitySeed.Admin) ||
+            User.IsInRole(Infrastructure.DbContextt.IdentitySeed.SuperAdmin))
+        {
+            return true;
+        }
+
+        return User.Identity?.IsAuthenticated == true &&
+               Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var currentUserId) &&
+               listing.OwnerId == currentUserId;
     }
 }

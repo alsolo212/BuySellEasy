@@ -39,7 +39,8 @@ public class ListingsController : ControllerBase
         [FromQuery] bool includeHidden = false)
     {
         var currentUserId = User.Identity?.IsAuthenticated == true ? User.GetRequiredUserId() : (Guid?)null;
-        var canSeeHidden = includeHidden && User.IsElevatedAdmin();
+        var canSeeHidden = includeHidden &&
+            (User.IsElevatedAdmin() || ownerId.HasValue && ownerId.Value == currentUserId);
         var query = _dbContext.Listings
             .AsNoTracking()
             .Include(listing => listing.Category)
@@ -114,7 +115,7 @@ public class ListingsController : ControllerBase
             .Include(listing => listing.Owner)
             .Include(listing => listing.Images)
             .Include(listing => listing.Orders)
-            .Where(listing => listing.OwnerId == userId && listing.Status != ListingStatus.Inactive)
+            .Where(listing => listing.OwnerId == userId)
             .OrderByDescending(listing => listing.CreatedAtUtc)
             .ToListAsync();
 
@@ -247,6 +248,11 @@ public class ListingsController : ControllerBase
             .Select(image => image.Url)
             .Where(IsManagedListingImageUrl)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        if (request.Quantity < listing.ReservedQuantity)
+        {
+            throw new InvalidOperationException("Quantity cannot be lower than the quantity reserved by active orders.");
+        }
 
         listing.Title = request.Title.Trim();
         listing.Description = request.Description.Trim();

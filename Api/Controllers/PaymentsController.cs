@@ -306,12 +306,12 @@ public class PaymentsController : ControllerBase
             throw new InvalidOperationException("You cannot order your own listing.");
         }
 
-        if (quantity < 1 || listing.Quantity < 1)
+        if (quantity < 1 || InventoryService.GetAvailableQuantity(listing.Quantity, listing.ReservedQuantity) < quantity)
         {
             throw new InvalidOperationException("The requested quantity is no longer available.");
         }
 
-        if (listing.Status is ListingStatus.Sold or ListingStatus.InDelivery or ListingStatus.Arrived or ListingStatus.Archived or ListingStatus.Inactive or ListingStatus.Blocked or ListingStatus.Draft)
+        if (listing.Status is not (ListingStatus.Active or ListingStatus.Published))
         {
             throw new InvalidOperationException("This listing is no longer available for purchase.");
         }

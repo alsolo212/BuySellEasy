@@ -18,17 +18,20 @@ namespace Api.Controllers;
 public class OrdersController : ControllerBase
 {
     private readonly ProductDbContext _dbContext;
+    private readonly InventoryService _inventory;
     private readonly OrderPaymentLifecycleService _lifecycle;
     private readonly OrderRealtimeNotifier _orderRealtime;
     private readonly StripePaymentService _stripe;
 
     public OrdersController(
         ProductDbContext dbContext,
+        InventoryService inventory,
         OrderPaymentLifecycleService lifecycle,
         OrderRealtimeNotifier orderRealtime,
         StripePaymentService stripe)
     {
         _dbContext = dbContext;
+        _inventory = inventory;
         _lifecycle = lifecycle;
         _orderRealtime = orderRealtime;
         _stripe = stripe;
@@ -62,10 +65,16 @@ public class OrdersController : ControllerBase
         EnsureCashOnDeliveryOnly(request.PaymentMethod);
         await EnsureCanPurchaseListingAsync(listing, buyerId, request.Quantity);
 
-        var order = CreateOrderEntity(listing, buyerId, request);
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync();
+        if (!await _inventory.TryReserveAsync(listing.Id, request.Quantity))
+        {
+            throw new InvalidOperationException("The requested quantity is no longer available.");
+        }
 
+        var order = CreateOrderEntity(listing, buyerId, request);
         _dbContext.Orders.Add(order);
         await _dbContext.SaveChangesAsync();
+        await transaction.CommitAsync();
         await UpdateOwnerListingCountAsync(listing.OwnerId);
 
         var created = await LoadOrderAsync(order.Id);
@@ -111,8 +120,13 @@ public class OrdersController : ControllerBase
         var createdOrders = new List<Order>();
 
         await using var transaction = await _dbContext.Database.BeginTransactionAsync();
-        foreach (var cartItem in cartItems)
+        foreach (var cartItem in cartItems.OrderBy(item => item.ListingId))
         {
+            if (!await _inventory.TryReserveAsync(cartItem.ListingId!.Value, cartItem.Quantity))
+            {
+                throw new InvalidOperationException("The requested quantity is no longer available.");
+            }
+
             createdOrders.Add(CreateOrderEntity(cartItem.Listing!, buyerId, request, cartItem.Quantity));
         }
         _dbContext.Orders.AddRange(createdOrders);
@@ -401,7 +415,7 @@ public class OrdersController : ControllerBase
             throw new InvalidOperationException("Order quantity must be at least 1.");
         }
 
-        if (listing.Quantity < 1)
+        if (InventoryService.GetAvailableQuantity(listing.Quantity, listing.ReservedQuantity) < 1)
         {
             throw new InvalidOperationException("This listing is out of stock.");
         }
@@ -411,7 +425,7 @@ public class OrdersController : ControllerBase
             throw new InvalidOperationException("This listing is no longer available for purchase.");
         }
 
-        if (listing.Quantity < requestedQuantity)
+        if (InventoryService.GetAvailableQuantity(listing.Quantity, listing.ReservedQuantity) < requestedQuantity)
         {
             throw new InvalidOperationException("The requested quantity is no longer available.");
         }
@@ -431,6 +445,7 @@ public class OrdersController : ControllerBase
             SellerId = listing.OwnerId,
             PaymentMethod = request.PaymentMethod,
             PaymentState = PaymentState.NotApplicable,
+            InventoryReserved = true,
             Quantity = request.Quantity,
             PaymentCardMasked = null,
             TotalAmount = listing.Price * request.Quantity,

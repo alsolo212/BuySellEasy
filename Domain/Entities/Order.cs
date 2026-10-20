@@ -25,6 +25,8 @@ namespace Domain.Entities
         [Range(1, int.MaxValue)]
         public int Quantity { get; set; } = 1;
 
+        public bool InventoryReserved { get; set; }
+
         [Range(typeof(decimal), "0.01", "999999999")]
         public decimal TotalAmount { get; set; }
 

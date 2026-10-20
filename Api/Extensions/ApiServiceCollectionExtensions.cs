@@ -138,6 +138,7 @@ public static class ApiServiceCollectionExtensions
 
         services.AddScoped<IJwtTokenService, JwtTokenService>();
         services.AddScoped<StripePaymentService>();
+        services.AddScoped<InventoryService>();
         services.AddScoped<OrderRealtimeNotifier>();
         services.AddScoped<OrderPaymentLifecycleService>();
         services.AddHostedService<OrderLifecycleBackgroundService>();

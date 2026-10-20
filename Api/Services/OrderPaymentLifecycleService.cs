@@ -14,17 +14,20 @@ public sealed class OrderPaymentLifecycleService
     private static readonly TimeSpan SellerDecisionWindow = TimeSpan.FromDays(4);
     private static readonly TimeSpan PickupConfirmationWindow = TimeSpan.FromDays(7);
     private readonly ProductDbContext _dbContext;
+    private readonly InventoryService _inventory;
     private readonly OrderRealtimeNotifier _orderRealtime;
     private readonly StripePaymentService _stripe;
     private readonly ILogger<OrderPaymentLifecycleService> _logger;
 
     public OrderPaymentLifecycleService(
         ProductDbContext dbContext,
+        InventoryService inventory,
         OrderRealtimeNotifier orderRealtime,
         StripePaymentService stripe,
         ILogger<OrderPaymentLifecycleService> logger)
     {
         _dbContext = dbContext;
+        _inventory = inventory;
         _orderRealtime = orderRealtime;
         _stripe = stripe;
         _logger = logger;
@@ -91,8 +94,223 @@ public sealed class OrderPaymentLifecycleService
         string? checkoutSessionId,
         CancellationToken cancellationToken)
     {
-        var paymentSession = await _dbContext.PaymentSessions
+        try
+        {
+            await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+            var paymentSession = await LoadPaymentSessionForUpdateAsync(paymentSessionId, cancellationToken)
+                ?? throw new KeyNotFoundException("The BSE payment session was not found.");
+
+            if (paymentSession.Status == PaymentSessionStatus.Processed)
+            {
+                await transaction.CommitAsync(cancellationToken);
+                return;
+            }
+
+            if (paymentSession.Status == PaymentSessionStatus.Failed &&
+                string.Equals(paymentSession.StripePaymentIntentId, paymentIntentId, StringComparison.Ordinal))
+            {
+                await transaction.CommitAsync(cancellationToken);
+                await RefundRejectedPaymentAsync(paymentSessionId, paymentIntentId, cancellationToken);
+                return;
+            }
+
+            if (!string.IsNullOrWhiteSpace(paymentSession.StripePaymentIntentId) &&
+                !string.Equals(paymentSession.StripePaymentIntentId, paymentIntentId, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("The payment intent does not match the BSE payment session.");
+            }
+
+            if (!string.IsNullOrWhiteSpace(checkoutSessionId) &&
+                !paymentSession.StripeCheckoutSessionId.StartsWith("pending-", StringComparison.Ordinal) &&
+                !paymentSession.StripeCheckoutSessionId.StartsWith("payment-intent-pending-", StringComparison.Ordinal) &&
+                !string.Equals(paymentSession.StripeCheckoutSessionId, checkoutSessionId, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("The Checkout session does not match the BSE payment session.");
+            }
+
+            var draft = JsonSerializer.Deserialize<CheckoutPaymentDraft>(paymentSession.DraftJson)
+                ?? throw new InvalidOperationException("The BSE payment draft is invalid.");
+
+            if (draft.BuyerId != paymentSession.BuyerId || draft.Items.Count == 0)
+            {
+                throw new PaymentFinalizationException("The BSE payment draft is no longer valid.");
+            }
+
+            var listingIds = draft.Items.Select(item => item.ListingId).Distinct().ToArray();
+            var listings = await _dbContext.Listings
+                .AsNoTracking()
+                .Include(item => item.Owner)
+                .Include(item => item.Images)
+                .Where(item => listingIds.Contains(item.Id))
+                .ToDictionaryAsync(item => item.Id, cancellationToken);
+
+            var validationError = ValidateCurrentPaymentState(paymentSession, draft, listings);
+            if (validationError is not null)
+            {
+                throw new PaymentFinalizationException(validationError);
+            }
+
+            if (draft.SaveCard)
+            {
+                await _stripe.KeepOnlyLatestSavedCardAsync(paymentSession.Buyer, paymentIntentId, cancellationToken);
+            }
+
+            var feeInCents = await _stripe.GetPaymentFeeInCentsAsync(paymentIntentId, cancellationToken);
+            var grossAmountInCents = draft.Items.Sum(item => StripePaymentService.ToStripeAmount(item.UnitPrice * item.Quantity));
+            var now = DateTime.UtcNow;
+
+            foreach (var item in draft.Items.OrderBy(item => item.ListingId))
+            {
+                if (!await _inventory.TryReserveAsync(item.ListingId, item.Quantity, item.UnitPrice, cancellationToken))
+                {
+                    throw new PaymentFinalizationException("The requested inventory changed while payment was completing.");
+                }
+            }
+
+            var createdOrders = new List<Order>();
+            foreach (var item in draft.Items)
+            {
+                var listing = listings[item.ListingId];
+                var grossItemAmountInCents = StripePaymentService.ToStripeAmount(item.UnitPrice * item.Quantity);
+                var allocatedFeeInCents = grossAmountInCents == 0
+                    ? 0
+                    : (long)Math.Round(feeInCents * (decimal)grossItemAmountInCents / grossAmountInCents, MidpointRounding.AwayFromZero);
+
+                createdOrders.Add(new Order
+                {
+                    ListingId = listing.Id,
+                    BuyerId = draft.BuyerId,
+                    SellerId = listing.OwnerId,
+                    Status = OrderStatus.Pending,
+                    PaymentMethod = BsePaymentMethod.Card,
+                    PaymentState = PaymentState.Paid,
+                    InventoryReserved = true,
+                    Quantity = item.Quantity,
+                    TotalAmount = item.UnitPrice * item.Quantity,
+                    StripeFeeAmount = allocatedFeeInCents / 100m,
+                    StripeFeeCalculated = feeInCents > 0,
+                    StripeCheckoutSessionId = checkoutSessionId,
+                    StripePaymentIntentId = paymentIntentId,
+                    StripeConnectAccountId = listing.Owner.StripeConnectAccountId,
+                    ListingTitleSnapshot = listing.Title,
+                    ListingPrimaryImageUrlSnapshot = listing.Images
+                        .OrderBy(image => image.SortOrder)
+                        .Select(image => image.Url)
+                        .FirstOrDefault(),
+                    BuyerFirstName = draft.BuyerFirstName,
+                    BuyerLastName = draft.BuyerLastName,
+                    BuyerEmail = draft.BuyerEmail,
+                    BuyerPhone = draft.BuyerPhone,
+                    DeliveryAddress = draft.DeliveryAddress,
+                    DeliveryCity = draft.DeliveryCity,
+                    CreatedAtUtc = now,
+                    UpdatedAtUtc = now,
+                    SellerDecisionDeadlineUtc = GetSellerDecisionDeadline(now),
+                    Shipment = new Shipment
+                    {
+                        RecipientFirstName = draft.BuyerFirstName,
+                        RecipientLastName = draft.BuyerLastName,
+                        RecipientPhone = draft.BuyerPhone,
+                        DeliveryAddress = draft.DeliveryAddress,
+                        DeliveryCity = draft.DeliveryCity,
+                        Status = ShipmentStatus.Pending,
+                        SenderFirstName = listing.Owner.UserName ?? string.Empty,
+                        SenderPhone = listing.Owner.PhoneNumber ?? string.Empty,
+                        CreatedAtUtc = now,
+                        UpdatedAtUtc = now
+                    }
+                });
+            }
+
+            _dbContext.Orders.AddRange(createdOrders);
+            foreach (var cartItemId in draft.CartItemIds)
+            {
+                var cartItem = await _dbContext.CartItems.FirstOrDefaultAsync(
+                    item => item.Id == cartItemId && item.UserId == draft.BuyerId,
+                    cancellationToken);
+                if (cartItem is not null)
+                {
+                    _dbContext.CartItems.Remove(cartItem);
+                }
+            }
+
+            paymentSession.StripePaymentIntentId = paymentIntentId;
+            paymentSession.Status = PaymentSessionStatus.Processed;
+            paymentSession.ProcessedAtUtc = now;
+            paymentSession.UpdatedAtUtc = now;
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+
+            foreach (var createdOrder in createdOrders)
+            {
+                await _orderRealtime.NotifyAsync(createdOrder, "created", cancellationToken);
+            }
+        }
+        catch (PaymentFinalizationException exception)
+        {
+            await FailPaymentAndRefundAsync(paymentSessionId, paymentIntentId, exception.Message, cancellationToken);
+        }
+    }
+
+    private async Task<PaymentSession?> LoadPaymentSessionForUpdateAsync(
+        Guid paymentSessionId,
+        CancellationToken cancellationToken)
+    {
+        return await _dbContext.PaymentSessions
+            .FromSqlInterpolated($"SELECT * FROM \"PaymentSessions\" WHERE \"Id\" = {paymentSessionId} FOR UPDATE")
             .Include(item => item.Buyer)
+            .SingleOrDefaultAsync(cancellationToken);
+    }
+
+    private static string? ValidateCurrentPaymentState(
+        PaymentSession paymentSession,
+        CheckoutPaymentDraft draft,
+        IReadOnlyDictionary<Guid, Listing> listings)
+    {
+        var expectedTotal = draft.Items.Sum(item => item.UnitPrice * item.Quantity);
+        if (paymentSession.TotalAmount != expectedTotal)
+        {
+            return "The payment total no longer matches the checkout draft.";
+        }
+
+        foreach (var item in draft.Items)
+        {
+            if (!listings.TryGetValue(item.ListingId, out var listing))
+            {
+                return "A listing from the paid cart no longer exists.";
+            }
+
+            if (listing.OwnerId != item.SellerId || item.Quantity < 1)
+            {
+                return "The paid cart contains an invalid listing item.";
+            }
+
+            if (listing.Price != item.UnitPrice)
+            {
+                return "The listing price changed before payment completion.";
+            }
+
+            if (listing.Status is not (ListingStatus.Active or ListingStatus.Published))
+            {
+                return "The listing is no longer available for purchase.";
+            }
+
+            if (InventoryService.GetAvailableQuantity(listing.Quantity, listing.ReservedQuantity) < item.Quantity)
+            {
+                return "The requested inventory is no longer available.";
+            }
+        }
+
+        return null;
+    }
+
+    private async Task FailPaymentAndRefundAsync(
+        Guid paymentSessionId,
+        string paymentIntentId,
+        string reason,
+        CancellationToken cancellationToken)
+    {
+        var paymentSession = await _dbContext.PaymentSessions
             .FirstOrDefaultAsync(item => item.Id == paymentSessionId, cancellationToken)
             ?? throw new KeyNotFoundException("The BSE payment session was not found.");
 
@@ -101,105 +319,41 @@ public sealed class OrderPaymentLifecycleService
             return;
         }
 
-        var draft = JsonSerializer.Deserialize<CheckoutPaymentDraft>(paymentSession.DraftJson)
-            ?? throw new InvalidOperationException("The BSE payment draft is invalid.");
-
-        if (draft.SaveCard)
-        {
-            await _stripe.KeepOnlyLatestSavedCardAsync(paymentSession.Buyer, paymentIntentId, cancellationToken);
-        }
-
-        var listingIds = draft.Items.Select(item => item.ListingId).Distinct().ToArray();
-        var listings = await _dbContext.Listings
-            .Include(item => item.Owner)
-            .Include(item => item.Images)
-            .Where(item => listingIds.Contains(item.Id))
-            .ToDictionaryAsync(item => item.Id, cancellationToken);
-
-        var feeInCents = await _stripe.GetPaymentFeeInCentsAsync(paymentIntentId, cancellationToken);
-        var grossAmountInCents = draft.Items.Sum(item => StripePaymentService.ToStripeAmount(item.UnitPrice * item.Quantity));
-        var now = DateTime.UtcNow;
-        var createdOrders = new List<Order>();
-
-        foreach (var item in draft.Items)
-        {
-            if (!listings.TryGetValue(item.ListingId, out var listing))
-            {
-                throw new KeyNotFoundException("A listing from the paid cart no longer exists.");
-            }
-
-            var grossItemAmountInCents = StripePaymentService.ToStripeAmount(item.UnitPrice * item.Quantity);
-            var allocatedFeeInCents = grossAmountInCents == 0
-                ? 0
-                : (long)Math.Round(feeInCents * (decimal)grossItemAmountInCents / grossAmountInCents, MidpointRounding.AwayFromZero);
-
-            createdOrders.Add(new Order
-            {
-                ListingId = listing.Id,
-                BuyerId = draft.BuyerId,
-                SellerId = listing.OwnerId,
-                Status = OrderStatus.Pending,
-                PaymentMethod = BsePaymentMethod.Card,
-                PaymentState = PaymentState.Paid,
-                Quantity = item.Quantity,
-                TotalAmount = item.UnitPrice * item.Quantity,
-                StripeFeeAmount = allocatedFeeInCents / 100m,
-                StripeFeeCalculated = feeInCents > 0,
-                StripeCheckoutSessionId = checkoutSessionId,
-                StripePaymentIntentId = paymentIntentId,
-                StripeConnectAccountId = listing.Owner.StripeConnectAccountId,
-                ListingTitleSnapshot = listing.Title,
-                ListingPrimaryImageUrlSnapshot = listing.Images
-                    .OrderBy(image => image.SortOrder)
-                    .Select(image => image.Url)
-                    .FirstOrDefault(),
-                BuyerFirstName = draft.BuyerFirstName,
-                BuyerLastName = draft.BuyerLastName,
-                BuyerEmail = draft.BuyerEmail,
-                BuyerPhone = draft.BuyerPhone,
-                DeliveryAddress = draft.DeliveryAddress,
-                DeliveryCity = draft.DeliveryCity,
-                CreatedAtUtc = now,
-                UpdatedAtUtc = now,
-                SellerDecisionDeadlineUtc = GetSellerDecisionDeadline(now),
-                Shipment = new Shipment
-                {
-                    RecipientFirstName = draft.BuyerFirstName,
-                    RecipientLastName = draft.BuyerLastName,
-                    RecipientPhone = draft.BuyerPhone,
-                    DeliveryAddress = draft.DeliveryAddress,
-                    DeliveryCity = draft.DeliveryCity,
-                    Status = ShipmentStatus.Pending,
-                    SenderFirstName = listing.Owner.UserName ?? string.Empty,
-                    SenderPhone = listing.Owner.PhoneNumber ?? string.Empty,
-                    CreatedAtUtc = now,
-                    UpdatedAtUtc = now
-                }
-            });
-        }
-
-        _dbContext.Orders.AddRange(createdOrders);
-        foreach (var cartItemId in draft.CartItemIds)
-        {
-            var cartItem = await _dbContext.CartItems.FirstOrDefaultAsync(
-                item => item.Id == cartItemId && item.UserId == draft.BuyerId,
-                cancellationToken);
-            if (cartItem is not null)
-            {
-                _dbContext.CartItems.Remove(cartItem);
-            }
-        }
-
         paymentSession.StripePaymentIntentId = paymentIntentId;
-        paymentSession.Status = PaymentSessionStatus.Processed;
-        paymentSession.ProcessedAtUtc = now;
-        paymentSession.UpdatedAtUtc = now;
+        paymentSession.Status = PaymentSessionStatus.Failed;
+        paymentSession.UpdatedAtUtc = DateTime.UtcNow;
         await _dbContext.SaveChangesAsync(cancellationToken);
 
-        foreach (var createdOrder in createdOrders)
+        _logger.LogWarning(
+            "Payment session {PaymentSessionId} was rejected after payment completion: {Reason}",
+            paymentSessionId,
+            reason);
+
+        await RefundRejectedPaymentAsync(paymentSessionId, paymentIntentId, cancellationToken);
+    }
+
+    private async Task RefundRejectedPaymentAsync(
+        Guid paymentSessionId,
+        string paymentIntentId,
+        CancellationToken cancellationToken)
+    {
+        try
         {
-            await _orderRealtime.NotifyAsync(createdOrder, "created", cancellationToken);
+            await _stripe.RefundPaymentIntentAsync(paymentSessionId, paymentIntentId, cancellationToken);
         }
+        catch (StripeException exception)
+        {
+            _logger.LogError(
+                exception,
+                "Unable to refund rejected payment session {PaymentSessionId}; Stripe webhook retry remains safe.",
+                paymentSessionId);
+            throw;
+        }
+    }
+
+    private sealed class PaymentFinalizationException : InvalidOperationException
+    {
+        public PaymentFinalizationException(string message) : base(message) { }
     }
 
     public async Task MarkDeliveredAndTransferAsync(Order order, CancellationToken cancellationToken = default)
@@ -211,10 +365,19 @@ public sealed class OrderPaymentLifecycleService
 
         if (order.Status != OrderStatus.Delivered)
         {
+            if (!await _inventory.TryCompleteSaleAsync(
+                    order.ListingId,
+                    order.Quantity,
+                    order.InventoryReserved,
+                    cancellationToken))
+            {
+                throw new InvalidOperationException("The listing inventory could not be finalized for this order.");
+            }
+
+            order.InventoryReserved = false;
             order.Status = OrderStatus.Delivered;
             order.DeliveredAtUtc = DateTime.UtcNow;
             order.UpdatedAtUtc = DateTime.UtcNow;
-            ApplyDeliveredListingState(order.Listing, order.Quantity);
             await _dbContext.SaveChangesAsync(cancellationToken);
             await _orderRealtime.NotifyAsync(order, cancellationToken: cancellationToken);
         }
@@ -299,8 +462,13 @@ public sealed class OrderPaymentLifecycleService
 
     public async Task RefundAsync(Order order, CancellationToken cancellationToken = default)
     {
-        if (order.PaymentMethod != BsePaymentMethod.Card ||
-            order.PaymentState is PaymentState.Refunded or PaymentState.NotApplicable)
+        if (order.PaymentState is PaymentState.Refunded or PaymentState.NotApplicable)
+        {
+            await ReleaseInventoryReservationAsync(order, cancellationToken);
+            return;
+        }
+
+        if (order.PaymentMethod != BsePaymentMethod.Card)
         {
             return;
         }
@@ -309,6 +477,8 @@ public sealed class OrderPaymentLifecycleService
         {
             return;
         }
+
+        await ReleaseInventoryReservationAsync(order, cancellationToken);
 
         order.PaymentState = PaymentState.RefundPending;
         await _dbContext.SaveChangesAsync(cancellationToken);
@@ -454,12 +624,38 @@ public sealed class OrderPaymentLifecycleService
         if (listing.Quantity <= soldQuantity)
         {
             listing.Quantity = 0;
+            listing.ReservedQuantity = 0;
             listing.Status = ListingStatus.Inactive;
             return;
         }
 
         listing.Quantity -= soldQuantity;
+        listing.ReservedQuantity = Math.Max(0, listing.ReservedQuantity - soldQuantity);
         listing.Status = ListingStatus.Published;
+    }
+
+    private async Task ReleaseInventoryReservationAsync(Order order, CancellationToken cancellationToken)
+    {
+        if (!order.InventoryReserved)
+        {
+            return;
+        }
+
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+        var markedReleased = await _dbContext.Orders
+            .Where(item => item.Id == order.Id && item.InventoryReserved)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(item => item.InventoryReserved, false)
+                .SetProperty(item => item.UpdatedAtUtc, DateTime.UtcNow), cancellationToken);
+
+        if (markedReleased == 1 &&
+            !await _inventory.TryReleaseAsync(order.ListingId, order.Quantity, cancellationToken))
+        {
+            throw new InvalidOperationException("The listing inventory reservation could not be released.");
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+        order.InventoryReserved = false;
     }
 }
 

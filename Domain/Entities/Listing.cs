@@ -24,6 +24,8 @@ namespace Domain.Entities
         [Range(1, int.MaxValue)]
         public int Quantity { get; set; } = 1;
 
+        public int ReservedQuantity { get; set; }
+
         public bool IsNegotiable { get; set; }
 
         [Required]

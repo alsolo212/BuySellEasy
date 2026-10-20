@@ -221,6 +221,9 @@ namespace Infrastructure.MigrationsPostgres
                     b.Property<int>("Quantity")
                         .HasColumnType("integer");
 
+                    b.Property<int>("ReservedQuantity")
+                        .HasColumnType("integer");
+
                     b.Property<int>("Status")
                         .HasColumnType("integer");
 
@@ -350,6 +353,9 @@ namespace Infrastructure.MigrationsPostgres
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<bool>("InventoryReserved")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("BuyerEmail")
                         .IsRequired()
                         .HasMaxLength(256)
@@ -468,6 +474,10 @@ namespace Infrastructure.MigrationsPostgres
 
                     b.HasIndex("SellerId");
 
+                    b.HasIndex("StripePaymentIntentId", "ListingId")
+                        .IsUnique()
+                        .HasFilter("\"StripePaymentIntentId\" IS NOT NULL");
+
                     b.ToTable("Orders", (string)null);
                 });
 
@@ -515,6 +525,10 @@ namespace Infrastructure.MigrationsPostgres
 
                     b.HasIndex("StripeCheckoutSessionId")
                         .IsUnique();
+
+                    b.HasIndex("StripePaymentIntentId")
+                        .IsUnique()
+                        .HasFilter("\"StripePaymentIntentId\" IS NOT NULL");
 
                     b.ToTable("PaymentSessions", (string)null);
                 });

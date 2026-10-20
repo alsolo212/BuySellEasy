@@ -109,7 +109,10 @@ public sealed class StripePaymentService
             }
         };
 
-        var session = await new SessionService().CreateAsync(options, cancellationToken: cancellationToken);
+        var session = await new SessionService().CreateAsync(
+            options,
+            new RequestOptions { IdempotencyKey = $"bse-checkout-session-{paymentSession.Id}" },
+            cancellationToken);
         return (session.Id, session.Url);
     }
 
@@ -243,6 +246,33 @@ public sealed class StripePaymentService
                 }
             },
             new RequestOptions { IdempotencyKey = $"bse-refund-{order.Id}" },
+            cancellationToken);
+
+        return refund.Id;
+    }
+
+    public async Task<string> RefundPaymentIntentAsync(
+        Guid paymentSessionId,
+        string paymentIntentId,
+        CancellationToken cancellationToken = default)
+    {
+        EnsureConfigured();
+
+        if (string.IsNullOrWhiteSpace(paymentIntentId))
+        {
+            throw new InvalidOperationException("The payment session has no Stripe payment intent.");
+        }
+
+        var refund = await new RefundService().CreateAsync(
+            new RefundCreateOptions
+            {
+                PaymentIntent = paymentIntentId,
+                Metadata = new Dictionary<string, string>
+                {
+                    ["payment_session_id"] = paymentSessionId.ToString()
+                }
+            },
+            new RequestOptions { IdempotencyKey = $"bse-payment-session-refund-{paymentSessionId}" },
             cancellationToken);
 
         return refund.Id;

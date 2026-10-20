@@ -106,10 +106,16 @@ public class UsersController : ControllerBase
     }
 
     [HttpGet("{id:guid}/profile")]
-    public async Task<ActionResult<UserProfileResponse>> GetPublicProfile(Guid id)
+    [AllowAnonymous]
+    public async Task<ActionResult<PublicUserProfileResponse>> GetPublicProfile(Guid id)
     {
         var user = await LoadProfileAsync(id);
-        return Ok(MarketplaceMapper.MapUserProfile(user));
+        if (user.IsBlocked && !CanAccessHiddenProfile(id))
+        {
+            throw new KeyNotFoundException("User profile was not found.");
+        }
+
+        return Ok(MarketplaceMapper.MapPublicUserProfile(user));
     }
 
     [Authorize(Roles = $"{IdentitySeed.Admin},{IdentitySeed.SuperAdmin}")]
@@ -314,6 +320,18 @@ public class UsersController : ControllerBase
             .Include(user => user.ReceivedReviews)
             .FirstOrDefaultAsync(user => user.Id == userId)
             ?? throw new KeyNotFoundException("User was not found.");
+    }
+
+    private bool CanAccessHiddenProfile(Guid userId)
+    {
+        if (User.IsElevatedAdmin())
+        {
+            return true;
+        }
+
+        return User.Identity?.IsAuthenticated == true &&
+               Guid.TryParse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value, out var currentUserId) &&
+               currentUserId == userId;
     }
 
     private async Task UpdateRolesAsync(User user, string requestedRole)

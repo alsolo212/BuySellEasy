@@ -161,6 +161,16 @@ namespace Infrastructure.DbContextt
                 .HasIndex(session => session.StripeCheckoutSessionId)
                 .IsUnique();
 
+            modelBuilder.Entity<PaymentSession>()
+                .HasIndex(session => session.StripePaymentIntentId)
+                .IsUnique()
+                .HasFilter("\"StripePaymentIntentId\" IS NOT NULL");
+
+            modelBuilder.Entity<Order>()
+                .HasIndex(order => new { order.StripePaymentIntentId, order.ListingId })
+                .IsUnique()
+                .HasFilter("\"StripePaymentIntentId\" IS NOT NULL");
+
             modelBuilder.Entity<User>()
                 .HasMany<PaymentSession>()
                 .WithOne(session => session.Buyer)

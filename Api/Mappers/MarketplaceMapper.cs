@@ -54,12 +54,34 @@ public static class MarketplaceMapper
             review.Status != ReviewStatus.Hidden)
     };
 
+    public static PublicUserProfileResponse MapPublicUserProfile(User user) => new()
+    {
+        Id = user.Id,
+        UserName = user.UserName ?? string.Empty,
+        ProfileImageUrl = user.ProfileImageUrl,
+        CreatedAtUtc = user.CreatedAt,
+        IsVerified = user.IsVerified,
+        ActiveListingsCount = user.ActiveListingsCount,
+        AverageRating = user.ReceivedReviews.Any(review =>
+            review.Status != ReviewStatus.Removed &&
+            review.Status != ReviewStatus.Hidden)
+            ? Math.Round(user.ReceivedReviews
+                .Where(review =>
+                    review.Status != ReviewStatus.Removed &&
+                    review.Status != ReviewStatus.Hidden)
+                .Average(review => review.Rating), 2)
+            : 0,
+        ReviewsCount = user.ReceivedReviews.Count(review =>
+            review.Status != ReviewStatus.Removed &&
+            review.Status != ReviewStatus.Hidden)
+    };
+
     public static ListingSummaryResponse MapListingSummary(Listing listing) => new()
     {
         Id = listing.Id,
         Title = listing.Title,
         Price = listing.Price,
-        Quantity = listing.Quantity,
+        Quantity = Math.Max(0, listing.Quantity - listing.ReservedQuantity),
         IsNegotiable = listing.IsNegotiable,
         City = listing.City,
         Condition = listing.Condition,
@@ -81,7 +103,7 @@ public static class MarketplaceMapper
         Title = listing.Title,
         Description = listing.Description,
         Price = listing.Price,
-        Quantity = listing.Quantity,
+        Quantity = Math.Max(0, listing.Quantity - listing.ReservedQuantity),
         IsNegotiable = listing.IsNegotiable,
         City = listing.City,
         Condition = listing.Condition,
@@ -134,7 +156,7 @@ public static class MarketplaceMapper
             Id = cartItem.Listing!.Id,
             Title = cartItem.Listing.Title,
             Price = cartItem.Listing.Price,
-            AvailableQuantity = cartItem.Listing.Quantity,
+            AvailableQuantity = Math.Max(0, cartItem.Listing.Quantity - cartItem.Listing.ReservedQuantity),
             IsNegotiable = cartItem.Listing.IsNegotiable,
             City = cartItem.Listing.City,
             CategoryName = cartItem.Listing.Category.Name ?? string.Empty,
