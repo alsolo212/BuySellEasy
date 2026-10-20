@@ -8,6 +8,7 @@ using Domain.Enums;
 using Infrastructure.DbContextt;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations;
@@ -19,37 +20,26 @@ namespace Api.Controllers;
 [Route("api/chats")]
 public class ChatsController : ControllerBase
 {
-    private const long MaxAttachmentSizeBytes = 10 * 1024 * 1024;
     private static readonly TimeSpan AdminInactivityTimeout = TimeSpan.FromMinutes(20);
-    private static readonly Dictionary<string, MessageType> AllowedAttachmentExtensions = new(StringComparer.OrdinalIgnoreCase)
-    {
-        [".jpg"] = MessageType.Image,
-        [".jpeg"] = MessageType.Image,
-        [".png"] = MessageType.Image,
-        [".webp"] = MessageType.Image,
-        [".gif"] = MessageType.Image,
-        [".pdf"] = MessageType.File,
-        [".doc"] = MessageType.File,
-        [".docx"] = MessageType.File,
-        [".txt"] = MessageType.File,
-        [".zip"] = MessageType.File
-    };
 
     private readonly ProductDbContext _dbContext;
     private readonly IHubContext<ChatHub> _hubContext;
     private readonly SupportBotService _supportBot;
     private readonly IWebHostEnvironment _webHostEnvironment;
+    private readonly FileUploadSecurityService _fileUploads;
 
     public ChatsController(
         ProductDbContext dbContext,
         IHubContext<ChatHub> hubContext,
         SupportBotService supportBot,
-        IWebHostEnvironment webHostEnvironment)
+        IWebHostEnvironment webHostEnvironment,
+        FileUploadSecurityService fileUploads)
     {
         _dbContext = dbContext;
         _hubContext = hubContext;
         _supportBot = supportBot;
         _webHostEnvironment = webHostEnvironment;
+        _fileUploads = fileUploads;
     }
 
     [HttpGet]
@@ -352,6 +342,12 @@ public class ChatsController : ControllerBase
             throw new ValidationException("Message must contain content or attachment.");
         }
 
+        var attachmentUrl = request.AttachmentUrl?.Trim();
+        if (!string.IsNullOrWhiteSpace(attachmentUrl) && !IsAttachmentForChat(attachmentUrl, id))
+        {
+            throw new ValidationException("The attachment does not belong to this chat.");
+        }
+
         var chat = await _dbContext.Chats
             .Include(item => item.Listing)
                 .ThenInclude(listing => listing!.Images)
@@ -378,7 +374,7 @@ public class ChatsController : ControllerBase
             SenderId = userId,
             Content = normalizedContent,
             Type = request.Type,
-            AttachmentUrl = request.AttachmentUrl?.Trim(),
+            AttachmentUrl = attachmentUrl,
             SentAtUtc = DateTime.UtcNow
         };
 
@@ -401,22 +397,17 @@ public class ChatsController : ControllerBase
     }
 
     [HttpPost("{id:guid}/attachments")]
-    public async Task<ActionResult<ChatAttachmentUploadResponse>> UploadAttachment(Guid id, [FromForm] IFormFile? file)
+    [EnableRateLimiting(ApiServiceCollectionExtensions.FileUploadRateLimitPolicyName)]
+    [RequestSizeLimit(FileUploadSecurityService.MaxChatRequestBytes)]
+    [RequestFormLimits(MultipartBodyLengthLimit = FileUploadSecurityService.MaxChatRequestBytes)]
+    public async Task<ActionResult<ChatAttachmentUploadResponse>> UploadAttachment(
+        Guid id,
+        [FromForm] IFormFile? file,
+        CancellationToken cancellationToken)
     {
         if (file is null || file.Length == 0)
         {
             return ValidationProblem(CreateValidationProblem("file", "Attachment file is required."));
-        }
-
-        if (file.Length > MaxAttachmentSizeBytes)
-        {
-            return ValidationProblem(CreateValidationProblem("file", "Attachment must be smaller than 10 MB."));
-        }
-
-        var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
-        if (!AllowedAttachmentExtensions.TryGetValue(extension, out var messageType))
-        {
-            return ValidationProblem(CreateValidationProblem("file", "This file type is not supported in chat."));
         }
 
         var userId = User.GetRequiredUserId();
@@ -433,23 +424,43 @@ public class ChatsController : ControllerBase
             return Forbid();
         }
 
-        var uploadsDirectory = Path.Combine(ResolveWebRootPath(), "uploads", "chats");
+        var validatedFile = await _fileUploads.ValidateAsync(
+            file,
+            FileUploadKind.ChatAttachment,
+            cancellationToken);
+
+        var uploadsDirectory = Path.Combine(ResolveWebRootPath(), "uploads", "chats", id.ToString("N"));
         Directory.CreateDirectory(uploadsDirectory);
 
-        var storedFileName = $"{Guid.NewGuid():N}{extension}";
+        var storedFileName = $"{Guid.NewGuid():N}{validatedFile.Extension}";
         var filePath = Path.Combine(uploadsDirectory, storedFileName);
 
         await using (var stream = System.IO.File.Create(filePath))
         {
-            await file.CopyToAsync(stream);
+            await file.CopyToAsync(stream, cancellationToken);
         }
 
         return Ok(new ChatAttachmentUploadResponse
         {
             FileName = file.FileName,
-            AttachmentUrl = $"/uploads/chats/{storedFileName}",
-            Type = messageType
+            AttachmentUrl = $"/uploads/chats/{id:N}/{storedFileName}",
+            Type = validatedFile.MessageType ?? MessageType.File
         });
+    }
+
+    private bool IsAttachmentForChat(string attachmentUrl, Guid chatId)
+    {
+        var prefix = $"/uploads/chats/{chatId:N}/";
+        if (!attachmentUrl.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var fileName = attachmentUrl[prefix.Length..];
+        return !string.IsNullOrWhiteSpace(fileName) &&
+            fileName == Path.GetFileName(fileName) &&
+            fileName.IndexOfAny(['/', '\\', '\0']) < 0 &&
+            System.IO.File.Exists(Path.Combine(ResolveWebRootPath(), "uploads", "chats", chatId.ToString("N"), fileName));
     }
 
     private async Task ProcessSupportMessageAsync(

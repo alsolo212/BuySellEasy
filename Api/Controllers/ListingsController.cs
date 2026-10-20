@@ -1,11 +1,13 @@
 using Api.Contracts.Listings;
 using Api.Extensions;
 using Api.Mappers;
+using Api.Services;
 using Domain.Entities;
 using Domain.Enums;
 using Infrastructure.DbContextt;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 
 namespace Api.Controllers;
@@ -14,17 +16,18 @@ namespace Api.Controllers;
 [Route("api/listings")]
 public class ListingsController : ControllerBase
 {
-    private const int MaxListingImagesCount = 8;
-    private const long MaxListingImageSizeBytes = 8 * 1024 * 1024;
-    private static readonly HashSet<string> AllowedImageExtensions = [".jpg", ".jpeg", ".png", ".webp"];
-
     private readonly ProductDbContext _dbContext;
     private readonly IWebHostEnvironment _webHostEnvironment;
+    private readonly FileUploadSecurityService _fileUploads;
 
-    public ListingsController(ProductDbContext dbContext, IWebHostEnvironment webHostEnvironment)
+    public ListingsController(
+        ProductDbContext dbContext,
+        IWebHostEnvironment webHostEnvironment,
+        FileUploadSecurityService fileUploads)
     {
         _dbContext = dbContext;
         _webHostEnvironment = webHostEnvironment;
+        _fileUploads = fileUploads;
     }
 
     [HttpGet]
@@ -380,50 +383,37 @@ public class ListingsController : ControllerBase
 
     [Authorize]
     [HttpPost("images")]
-    public async Task<ActionResult<ListingImageUploadResponse>> UploadImages([FromForm] List<IFormFile>? files)
+    [EnableRateLimiting(ApiServiceCollectionExtensions.FileUploadRateLimitPolicyName)]
+    [RequestSizeLimit(FileUploadSecurityService.MaxListingRequestBytes)]
+    [RequestFormLimits(MultipartBodyLengthLimit = FileUploadSecurityService.MaxListingRequestBytes)]
+    public async Task<ActionResult<ListingImageUploadResponse>> UploadImages(
+        [FromForm] List<IFormFile>? files,
+        CancellationToken cancellationToken)
     {
         if (files is null || files.Count == 0)
         {
             return ValidationProblem(CreateValidationProblem("files", "At least one image is required."));
         }
 
-        if (files.Count > MaxListingImagesCount)
-        {
-            return ValidationProblem(CreateValidationProblem("files", $"You can upload up to {MaxListingImagesCount} images."));
-        }
-
-        foreach (var file in files)
-        {
-            if (file.Length == 0)
-            {
-                return ValidationProblem(CreateValidationProblem("files", "One of the selected files is empty."));
-            }
-
-            if (file.Length > MaxListingImageSizeBytes)
-            {
-                return ValidationProblem(CreateValidationProblem("files", "Each image must be smaller than 8 MB."));
-            }
-
-            var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
-            if (!AllowedImageExtensions.Contains(extension))
-            {
-                return ValidationProblem(CreateValidationProblem("files", "Only JPG, PNG, and WEBP images are supported."));
-            }
-        }
+        var validatedFiles = await _fileUploads.ValidateBatchAsync(
+            files,
+            FileUploadKind.ListingImage,
+            cancellationToken);
 
         var uploadsDirectory = Path.Combine(ResolveWebRootPath(), "uploads", "listings");
         Directory.CreateDirectory(uploadsDirectory);
 
         var uploadedImages = new List<ListingImageUploadItemResponse>();
-        foreach (var file in files)
+        for (var index = 0; index < files.Count; index++)
         {
-            var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+            var file = files[index];
+            var extension = validatedFiles[index].Extension;
             var fileName = $"{Guid.NewGuid():N}{extension}";
             var filePath = Path.Combine(uploadsDirectory, fileName);
 
             await using (var stream = System.IO.File.Create(filePath))
             {
-                await file.CopyToAsync(stream);
+                await file.CopyToAsync(stream, cancellationToken);
             }
 
             uploadedImages.Add(new ListingImageUploadItemResponse

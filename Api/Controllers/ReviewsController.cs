@@ -7,6 +7,7 @@ using Infrastructure.DbContextt;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.ComponentModel.DataAnnotations;
 
 namespace Api.Controllers;
 
@@ -76,10 +77,15 @@ public class ReviewsController : ControllerBase
 
         if (order.BuyerId != authorId && order.SellerId != authorId)
         {
-            throw new UnauthorizedAccessException("You cannot review this order.");
+            return Forbid();
         }
 
-        var targetUserId = request.TargetUserId ?? (order.BuyerId == authorId ? order.SellerId : order.BuyerId);
+        var targetUserId = order.BuyerId == authorId ? order.SellerId : order.BuyerId;
+        if (targetUserId == authorId ||
+            request.TargetUserId.HasValue && request.TargetUserId.Value != targetUserId)
+        {
+            throw new ValidationException("A review can only target the other participant of the order.");
+        }
 
         var alreadyExists = await _dbContext.Reviews.AnyAsync(review =>
             review.OrderId == order.Id &&

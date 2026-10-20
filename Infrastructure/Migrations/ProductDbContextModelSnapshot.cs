@@ -353,9 +353,6 @@ namespace Infrastructure.MigrationsPostgres
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<bool>("InventoryReserved")
-                        .HasColumnType("boolean");
-
                     b.Property<string>("BuyerEmail")
                         .IsRequired()
                         .HasMaxLength(256)
@@ -394,6 +391,9 @@ namespace Infrastructure.MigrationsPostgres
                         .IsRequired()
                         .HasMaxLength(120)
                         .HasColumnType("character varying(120)");
+
+                    b.Property<bool>("InventoryReserved")
+                        .HasColumnType("boolean");
 
                     b.Property<Guid>("ListingId")
                         .HasColumnType("uuid");
@@ -638,9 +638,10 @@ namespace Infrastructure.MigrationsPostgres
 
                     b.HasIndex("ListingId");
 
-                    b.HasIndex("OrderId");
-
                     b.HasIndex("TargetUserId");
+
+                    b.HasIndex("OrderId", "AuthorId")
+                        .IsUnique();
 
                     b.ToTable("Reviews", (string)null);
                 });

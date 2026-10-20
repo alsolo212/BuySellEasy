@@ -1,4 +1,6 @@
 using System.Text;
+using System.Security.Claims;
+using System.Threading.RateLimiting;
 using Api.Hubs;
 using Api.Options;
 using Api.Services;
@@ -8,6 +10,8 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Http.Features;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.Extensions.Options;
@@ -18,6 +22,8 @@ namespace Api.Extensions;
 public static class ApiServiceCollectionExtensions
 {
     public const string FrontendCorsPolicyName = "Frontend";
+    public const string AuthRateLimitPolicyName = "auth-endpoints";
+    public const string FileUploadRateLimitPolicyName = "file-uploads";
 
     public static IServiceCollection AddApiServices(this IServiceCollection services, IConfiguration configuration)
     {
@@ -25,6 +31,10 @@ public static class ApiServiceCollectionExtensions
         services.Configure<GoogleAuthOptions>(configuration.GetSection(GoogleAuthOptions.SectionName));
         services.Configure<SupportBotOptions>(configuration.GetSection(SupportBotOptions.SectionName));
         services.Configure<StripeOptions>(configuration.GetSection(StripeOptions.SectionName));
+        services.Configure<FormOptions>(options =>
+        {
+            options.MultipartBodyLengthLimit = FileUploadSecurityService.MaxListingRequestBytes;
+        });
 
         services
             .AddControllers()
@@ -37,6 +47,49 @@ public static class ApiServiceCollectionExtensions
             {
                 options.PayloadSerializerOptions.Converters.Add(new JsonStringEnumConverter());
             });
+
+        services.AddRateLimiter(options =>
+        {
+            options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+            options.OnRejected = async (context, cancellationToken) =>
+            {
+                if (context.HttpContext.Response.HasStarted)
+                {
+                    return;
+                }
+
+                context.HttpContext.Response.ContentType = "application/problem+json";
+                await context.HttpContext.Response.WriteAsJsonAsync(new ProblemDetails
+                {
+                    Status = StatusCodes.Status429TooManyRequests,
+                    Title = "Too many requests",
+                    Detail = "Please try again later.",
+                    Instance = context.HttpContext.Request.Path
+                }, cancellationToken);
+            };
+
+            options.AddPolicy(AuthRateLimitPolicyName, context =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    GetClientPartitionKey(context),
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 10,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueLimit = 0,
+                        AutoReplenishment = true
+                    }));
+
+            options.AddPolicy(FileUploadRateLimitPolicyName, context =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    GetAuthenticatedClientPartitionKey(context),
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 20,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueLimit = 0,
+                        AutoReplenishment = true
+                    }));
+        });
 
         services.Configure<ApiBehaviorOptions>(options =>
         {
@@ -85,6 +138,9 @@ public static class ApiServiceCollectionExtensions
                 options.Password.RequireNonAlphanumeric = false;
                 options.Password.RequiredLength = 6;
                 options.User.AllowedUserNameCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._@+ ";
+                options.Lockout.AllowedForNewUsers = true;
+                options.Lockout.MaxFailedAccessAttempts = 5;
+                options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
             })
             .AddEntityFrameworkStores<ProductDbContext>()
             .AddDefaultTokenProviders()
@@ -141,6 +197,7 @@ public static class ApiServiceCollectionExtensions
         services.AddScoped<InventoryService>();
         services.AddScoped<OrderRealtimeNotifier>();
         services.AddScoped<OrderPaymentLifecycleService>();
+        services.AddSingleton<FileUploadSecurityService>();
         services.AddHostedService<OrderLifecycleBackgroundService>();
         services.AddHttpClient<SupportBotService>((serviceProvider, client) =>
         {
@@ -149,5 +206,16 @@ public static class ApiServiceCollectionExtensions
         });
 
         return services;
+    }
+
+    private static string GetClientPartitionKey(HttpContext context)
+    {
+        return context.Connection.RemoteIpAddress?.ToString() ?? "unknown-client";
+    }
+
+    private static string GetAuthenticatedClientPartitionKey(HttpContext context)
+    {
+        return context.User.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? GetClientPartitionKey(context);
     }
 }

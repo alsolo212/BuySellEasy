@@ -1,11 +1,13 @@
 using Api.Contracts.Users;
 using Api.Extensions;
 using Api.Mappers;
+using Api.Services;
 using Domain.IdentityEntities;
 using Infrastructure.DbContextt;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations;
 
@@ -15,21 +17,21 @@ namespace Api.Controllers;
 [Route("api/users")]
 public class UsersController : ControllerBase
 {
-    private const long AvatarMaxFileSizeBytes = 5 * 1024 * 1024;
-    private static readonly HashSet<string> AllowedAvatarExtensions = [".jpg", ".jpeg", ".png", ".webp"];
-
     private readonly ProductDbContext _dbContext;
     private readonly IWebHostEnvironment _webHostEnvironment;
     private readonly UserManager<User> _userManager;
+    private readonly FileUploadSecurityService _fileUploads;
 
     public UsersController(
         ProductDbContext dbContext,
         UserManager<User> userManager,
-        IWebHostEnvironment webHostEnvironment)
+        IWebHostEnvironment webHostEnvironment,
+        FileUploadSecurityService fileUploads)
     {
         _dbContext = dbContext;
         _userManager = userManager;
         _webHostEnvironment = webHostEnvironment;
+        _fileUploads = fileUploads;
     }
 
     [Authorize]
@@ -99,10 +101,15 @@ public class UsersController : ControllerBase
 
     [Authorize]
     [HttpPost("me/avatar")]
-    public async Task<ActionResult<AvatarUploadResponse>> UploadAvatar([FromForm] IFormFile? file)
+    [EnableRateLimiting(ApiServiceCollectionExtensions.FileUploadRateLimitPolicyName)]
+    [RequestSizeLimit(FileUploadSecurityService.MaxAvatarRequestBytes)]
+    [RequestFormLimits(MultipartBodyLengthLimit = FileUploadSecurityService.MaxAvatarRequestBytes)]
+    public async Task<ActionResult<AvatarUploadResponse>> UploadAvatar(
+        [FromForm] IFormFile? file,
+        CancellationToken cancellationToken)
     {
         var userId = User.GetRequiredUserId();
-        return await UploadAvatarInternalAsync(userId, file);
+        return await UploadAvatarInternalAsync(userId, file, cancellationToken);
     }
 
     [HttpGet("{id:guid}/profile")]
@@ -246,7 +253,13 @@ public class UsersController : ControllerBase
 
     [Authorize(Roles = $"{IdentitySeed.Admin},{IdentitySeed.SuperAdmin}")]
     [HttpPost("admin/{id:guid}/avatar")]
-    public async Task<ActionResult<AvatarUploadResponse>> UploadAvatarForAdmin(Guid id, [FromForm] IFormFile? file)
+    [EnableRateLimiting(ApiServiceCollectionExtensions.FileUploadRateLimitPolicyName)]
+    [RequestSizeLimit(FileUploadSecurityService.MaxAvatarRequestBytes)]
+    [RequestFormLimits(MultipartBodyLengthLimit = FileUploadSecurityService.MaxAvatarRequestBytes)]
+    public async Task<ActionResult<AvatarUploadResponse>> UploadAvatarForAdmin(
+        Guid id,
+        [FromForm] IFormFile? file,
+        CancellationToken cancellationToken)
     {
         var targetUser = await _userManager.FindByIdAsync(id.ToString()) ?? throw new KeyNotFoundException("User was not found.");
         var targetRoles = await _userManager.GetRolesAsync(targetUser);
@@ -255,7 +268,7 @@ public class UsersController : ControllerBase
             throw new UnauthorizedAccessException("Only super admin can manage another super admin.");
         }
 
-        return await UploadAvatarInternalAsync(targetUser.Id, file);
+        return await UploadAvatarInternalAsync(targetUser.Id, file, cancellationToken);
     }
 
     [Authorize(Roles = $"{IdentitySeed.Admin},{IdentitySeed.SuperAdmin}")]
@@ -410,23 +423,20 @@ public class UsersController : ControllerBase
             : _webHostEnvironment.WebRootPath;
     }
 
-    private async Task<ActionResult<AvatarUploadResponse>> UploadAvatarInternalAsync(Guid targetUserId, IFormFile? file)
+    private async Task<ActionResult<AvatarUploadResponse>> UploadAvatarInternalAsync(
+        Guid targetUserId,
+        IFormFile? file,
+        CancellationToken cancellationToken)
     {
         if (file is null || file.Length == 0)
         {
             return ValidationProblem(CreateValidationProblem("file", "Avatar file is required."));
         }
 
-        if (file.Length > AvatarMaxFileSizeBytes)
-        {
-            return ValidationProblem(CreateValidationProblem("file", "Avatar file must be smaller than 5 MB."));
-        }
-
-        var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
-        if (!AllowedAvatarExtensions.Contains(extension))
-        {
-            return ValidationProblem(CreateValidationProblem("file", "Only JPG, PNG, and WEBP images are supported."));
-        }
+        var validatedFile = await _fileUploads.ValidateAsync(
+            file,
+            FileUploadKind.Avatar,
+            cancellationToken);
 
         var userExists = await _userManager.Users.AnyAsync(user => user.Id == targetUserId);
         if (!userExists)
@@ -438,12 +448,12 @@ public class UsersController : ControllerBase
         var avatarsDirectory = Path.Combine(webRootPath, "uploads", "avatars");
         Directory.CreateDirectory(avatarsDirectory);
 
-        var fileName = $"{targetUserId:N}-{Guid.NewGuid():N}{extension}";
+        var fileName = $"{targetUserId:N}-{Guid.NewGuid():N}{validatedFile.Extension}";
         var filePath = Path.Combine(avatarsDirectory, fileName);
 
         await using (var stream = System.IO.File.Create(filePath))
         {
-            await file.CopyToAsync(stream);
+            await file.CopyToAsync(stream, cancellationToken);
         }
 
         return Ok(new AvatarUploadResponse

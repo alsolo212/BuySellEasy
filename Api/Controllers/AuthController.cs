@@ -1,4 +1,5 @@
 using Api.Contracts.Auth;
+using Api.Extensions;
 using Api.Options;
 using Api.Services;
 using Application.DTO.IdentityDto;
@@ -8,6 +9,7 @@ using Infrastructure.DbContextt;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Options;
 
 namespace Api.Controllers;
@@ -36,6 +38,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("register")]
+    [EnableRateLimiting(ApiServiceCollectionExtensions.AuthRateLimitPolicyName)]
     [ProducesResponseType(typeof(AuthResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<AuthResponse>> Register([FromBody] RegisterDTO request)
@@ -58,7 +61,8 @@ public class AuthController : ControllerBase
             Email = request.Email,
             PhoneNumber = request.Phone,
             CreatedAt = DateTime.UtcNow,
-            IsVerified = false
+            IsVerified = false,
+            LockoutEnabled = true
         };
 
         var createResult = await _userManager.CreateAsync(user, request.Password);
@@ -79,6 +83,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("login")]
+    [EnableRateLimiting(ApiServiceCollectionExtensions.AuthRateLimitPolicyName)]
     [ProducesResponseType(typeof(AuthResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -90,20 +95,25 @@ public class AuthController : ControllerBase
         }
 
         var user = await _userManager.FindByEmailAsync(request.Email);
-        if (user is null)
+        if (user is null || user.IsBlocked)
         {
-            return Unauthorized(new { message = "Invalid email or password." });
+            return InvalidCredentials();
         }
 
-        if (user.IsBlocked)
+        if (!user.LockoutEnabled)
         {
-            return StatusCode(StatusCodes.Status403Forbidden, new { message = "This account is blocked." });
+            user.LockoutEnabled = true;
+            var lockoutUpdateResult = await _userManager.UpdateAsync(user);
+            if (!lockoutUpdateResult.Succeeded)
+            {
+                return InvalidCredentials();
+            }
         }
 
-        var result = await _signInManager.CheckPasswordSignInAsync(user, request.Password, false);
+        var result = await _signInManager.CheckPasswordSignInAsync(user, request.Password, lockoutOnFailure: true);
         if (!result.Succeeded)
         {
-            return Unauthorized(new { message = "Invalid email or password." });
+            return InvalidCredentials();
         }
 
         user.LastLogin = DateTime.UtcNow;
@@ -113,10 +123,10 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("google")]
+    [EnableRateLimiting(ApiServiceCollectionExtensions.AuthRateLimitPolicyName)]
     [ProducesResponseType(typeof(AuthResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<ActionResult<AuthResponse>> GoogleLogin([FromBody] GoogleLoginRequest request)
     {
         if (!ModelState.IsValid)
@@ -143,12 +153,12 @@ public class AuthController : ControllerBase
         }
         catch (InvalidJwtException)
         {
-            return Unauthorized(new { message = "The Google credential is invalid or expired." });
+            return InvalidCredentials();
         }
 
         if (!payload.EmailVerified || string.IsNullOrWhiteSpace(payload.Email) || string.IsNullOrWhiteSpace(payload.Subject))
         {
-            return Unauthorized(new { message = "Google did not provide a verified email address." });
+            return InvalidCredentials();
         }
 
         var user = await _userManager.FindByLoginAsync(GoogleLoginProvider, payload.Subject);
@@ -157,7 +167,7 @@ public class AuthController : ControllerBase
             user = await _userManager.FindByEmailAsync(payload.Email);
             if (user?.IsBlocked == true)
             {
-                return StatusCode(StatusCodes.Status403Forbidden, new { message = "This account is blocked." });
+                return InvalidCredentials();
             }
 
             if (user is null)
@@ -170,7 +180,8 @@ public class AuthController : ControllerBase
                     ProfileImageUrl = string.IsNullOrWhiteSpace(payload.Picture) ? null : payload.Picture,
                     CreatedAt = DateTime.UtcNow,
                     LastLogin = DateTime.UtcNow,
-                    IsVerified = false
+                    IsVerified = false,
+                    LockoutEnabled = true
                 };
 
                 var createResult = await _userManager.CreateAsync(user);
@@ -222,7 +233,7 @@ public class AuthController : ControllerBase
 
         if (user.IsBlocked)
         {
-            return StatusCode(StatusCodes.Status403Forbidden, new { message = "This account is blocked." });
+            return InvalidCredentials();
         }
 
         user.LastLogin = DateTime.UtcNow;
@@ -320,6 +331,11 @@ public class AuthController : ControllerBase
             ProfileImageUrl = user.ProfileImageUrl,
             HasPassword = !string.IsNullOrWhiteSpace(user.PasswordHash)
         };
+    }
+
+    private static UnauthorizedObjectResult InvalidCredentials()
+    {
+        return new UnauthorizedObjectResult(new { message = "Invalid email or password." });
     }
 
     private async Task<string> BuildUniqueUserNameAsync(string? displayName, string email)

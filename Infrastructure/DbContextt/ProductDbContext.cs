@@ -201,6 +201,10 @@ namespace Infrastructure.DbContextt
                 .HasForeignKey(review => review.OrderId)
                 .OnDelete(DeleteBehavior.Restrict);
 
+            modelBuilder.Entity<Review>()
+                .HasIndex(review => new { review.OrderId, review.AuthorId })
+                .IsUnique();
+
             modelBuilder.Entity<User>()
                 .HasMany(user => user.BuyerChats)
                 .WithOne(chat => chat.Buyer)

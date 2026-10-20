@@ -26,12 +26,29 @@ if (!app.Environment.IsDevelopment())
 {
     app.UseHttpsRedirection();
 }
+app.UseRouting();
 app.UseCors(ApiServiceCollectionExtensions.FrontendCorsPolicyName);
 app.UseMiddleware<ApiExceptionMiddleware>();
 app.UseAuthentication();
+app.UseRateLimiter();
 app.UseMiddleware<BlockedUserMiddleware>();
 app.UseAuthorization();
-app.UseStaticFiles();
+
+// Only listing images are public user uploads. Other uploaded files are served
+// through authenticated controller endpoints with ownership checks.
+var listingImagesPath = Path.Combine(
+    app.Environment.WebRootPath ?? Path.Combine(app.Environment.ContentRootPath, "wwwroot"),
+    "uploads",
+    "listings");
+
+Directory.CreateDirectory(listingImagesPath);
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(listingImagesPath),
+    RequestPath = "/uploads/listings",
+    OnPrepareResponse = context =>
+        context.Context.Response.Headers["X-Content-Type-Options"] = "nosniff"
+});
 
 // Keep existing category image URLs working after removing the MVC host.
 var categoryImagesPath = Path.Combine(
