@@ -73,7 +73,9 @@ public static class ApiServiceCollectionExtensions
 
         services.AddDbContext<ProductDbContext>(options =>
         {
-            options.UseNpgsql(configuration.GetConnectionString("DefaultConnection"));
+            options.UseNpgsql(
+                configuration.GetConnectionString("DefaultConnection"),
+                npgsqlOptions => npgsqlOptions.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery));
         });
 
         services.AddIdentity<User, Role>(options =>
@@ -120,7 +122,8 @@ public static class ApiServiceCollectionExtensions
                         var accessToken = context.Request.Query["access_token"];
                         var path = context.HttpContext.Request.Path;
                         if (!string.IsNullOrWhiteSpace(accessToken) &&
-                            path.StartsWithSegments("/hubs/chat"))
+                            (path.StartsWithSegments("/hubs/chat") ||
+                             path.StartsWithSegments("/hubs/orders")))
                         {
                             context.Token = accessToken;
                         }
@@ -135,6 +138,7 @@ public static class ApiServiceCollectionExtensions
 
         services.AddScoped<IJwtTokenService, JwtTokenService>();
         services.AddScoped<StripePaymentService>();
+        services.AddScoped<OrderRealtimeNotifier>();
         services.AddScoped<OrderPaymentLifecycleService>();
         services.AddHostedService<OrderLifecycleBackgroundService>();
         services.AddHttpClient<SupportBotService>((serviceProvider, client) =>

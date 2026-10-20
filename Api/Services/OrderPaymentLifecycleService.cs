@@ -14,15 +14,18 @@ public sealed class OrderPaymentLifecycleService
     private static readonly TimeSpan SellerDecisionWindow = TimeSpan.FromDays(4);
     private static readonly TimeSpan PickupConfirmationWindow = TimeSpan.FromDays(7);
     private readonly ProductDbContext _dbContext;
+    private readonly OrderRealtimeNotifier _orderRealtime;
     private readonly StripePaymentService _stripe;
     private readonly ILogger<OrderPaymentLifecycleService> _logger;
 
     public OrderPaymentLifecycleService(
         ProductDbContext dbContext,
+        OrderRealtimeNotifier orderRealtime,
         StripePaymentService stripe,
         ILogger<OrderPaymentLifecycleService> logger)
     {
         _dbContext = dbContext;
+        _orderRealtime = orderRealtime;
         _stripe = stripe;
         _logger = logger;
     }
@@ -192,6 +195,11 @@ public sealed class OrderPaymentLifecycleService
         paymentSession.ProcessedAtUtc = now;
         paymentSession.UpdatedAtUtc = now;
         await _dbContext.SaveChangesAsync(cancellationToken);
+
+        foreach (var createdOrder in createdOrders)
+        {
+            await _orderRealtime.NotifyAsync(createdOrder, "created", cancellationToken);
+        }
     }
 
     public async Task MarkDeliveredAndTransferAsync(Order order, CancellationToken cancellationToken = default)
@@ -208,6 +216,7 @@ public sealed class OrderPaymentLifecycleService
             order.UpdatedAtUtc = DateTime.UtcNow;
             ApplyDeliveredListingState(order.Listing, order.Quantity);
             await _dbContext.SaveChangesAsync(cancellationToken);
+            await _orderRealtime.NotifyAsync(order, cancellationToken: cancellationToken);
         }
 
         if (order.PaymentMethod != BsePaymentMethod.Card || order.PaymentState == PaymentState.Transferred)
@@ -215,8 +224,12 @@ public sealed class OrderPaymentLifecycleService
             return;
         }
 
-        order.PaymentState = PaymentState.TransferPending;
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        if (order.PaymentState != PaymentState.TransferPending)
+        {
+            order.PaymentState = PaymentState.TransferPending;
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            await _orderRealtime.NotifyAsync(order, cancellationToken: cancellationToken);
+        }
 
         try
         {
@@ -227,7 +240,7 @@ public sealed class OrderPaymentLifecycleService
             if (string.IsNullOrWhiteSpace(order.StripeConnectAccountId) ||
                 !await _stripe.CanReceiveTransfersAsync(order.Seller, cancellationToken))
             {
-                _logger.LogWarning("Seller {SellerId} is not ready to receive transfer for order {OrderId}.", order.SellerId, order.Id);
+                _logger.LogDebug("Seller {SellerId} is not ready to receive transfer for order {OrderId}; it will remain pending.", order.SellerId, order.Id);
                 return;
             }
 
@@ -244,11 +257,44 @@ public sealed class OrderPaymentLifecycleService
             order.PaymentState = PaymentState.Transferred;
             order.UpdatedAtUtc = DateTime.UtcNow;
             await _dbContext.SaveChangesAsync(cancellationToken);
+            await _orderRealtime.NotifyAsync(order, cancellationToken: cancellationToken);
         }
-        catch (Exception exception) when (exception is StripeException or InvalidOperationException)
+        catch (StripeException exception) when (IsTerminalTransferFailure(exception))
         {
-            _logger.LogError(exception, "Unable to transfer payout for order {OrderId}; it will be retried.", order.Id);
+            order.PaymentState = PaymentState.Failed;
+            order.UpdatedAtUtc = DateTime.UtcNow;
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            await _orderRealtime.NotifyAsync(order, cancellationToken: cancellationToken);
+
+            _logger.LogWarning(
+                "Payout for order {OrderId} was not transferred and will not be retried because the Stripe source charge has no transferable amount. {StripeMessage}",
+                order.Id,
+                exception.StripeError?.Message ?? exception.Message);
         }
+        catch (StripeException exception)
+        {
+            // Balance and settlement delays are expected to be recoverable. Keep the
+            // order pending so the background worker can retry after Stripe funds settle,
+            // but do not report a normal retry as an application error.
+            _logger.LogDebug(
+                exception,
+                "Payout for order {OrderId} remains pending and will be retried when Stripe funds are available.",
+                order.Id);
+        }
+        catch (InvalidOperationException exception)
+        {
+            _logger.LogError(exception, "Unable to transfer payout for order {OrderId}.", order.Id);
+        }
+    }
+
+    private static bool IsTerminalTransferFailure(StripeException exception)
+    {
+        var code = exception.StripeError?.Code;
+        var message = exception.StripeError?.Message ?? exception.Message;
+
+        return string.Equals(code, "amount_too_large", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(code, "charge_already_refunded", StringComparison.OrdinalIgnoreCase) ||
+               message.Contains("must not exceed the source amount", StringComparison.OrdinalIgnoreCase);
     }
 
     public async Task RefundAsync(Order order, CancellationToken cancellationToken = default)
@@ -266,6 +312,7 @@ public sealed class OrderPaymentLifecycleService
 
         order.PaymentState = PaymentState.RefundPending;
         await _dbContext.SaveChangesAsync(cancellationToken);
+        await _orderRealtime.NotifyAsync(order, cancellationToken: cancellationToken);
 
         try
         {
@@ -279,6 +326,7 @@ public sealed class OrderPaymentLifecycleService
             order.PaymentState = PaymentState.Refunded;
             order.UpdatedAtUtc = DateTime.UtcNow;
             await _dbContext.SaveChangesAsync(cancellationToken);
+            await _orderRealtime.NotifyAsync(order, cancellationToken: cancellationToken);
         }
         catch (Exception exception) when (exception is StripeException or InvalidOperationException)
         {
@@ -309,6 +357,7 @@ public sealed class OrderPaymentLifecycleService
                 order.Shipment.UpdatedAtUtc = now;
             }
             await _dbContext.SaveChangesAsync(cancellationToken);
+            await _orderRealtime.NotifyAsync(order, cancellationToken: cancellationToken);
             await RefundAsync(order, cancellationToken);
         }
 

@@ -26,15 +26,29 @@ public class CatalogController : ControllerBase
             .OrderBy(category => category.Name)
             .ToListAsync();
 
+        var featuredListingIds = await _dbContext.Listings
+            .AsNoTracking()
+            .Where(listing => listing.Status == ListingStatus.Published || listing.Status == ListingStatus.Active)
+            .OrderBy(_ => Guid.NewGuid())
+            .Take(10)
+            .Select(listing => listing.Id)
+            .ToListAsync();
+
         var featuredListings = await _dbContext.Listings
             .AsNoTracking()
             .Include(listing => listing.Category)
             .Include(listing => listing.Owner)
             .Include(listing => listing.Images)
-            .Where(listing => listing.Status == ListingStatus.Published || listing.Status == ListingStatus.Active)
-            .OrderBy(_ => Guid.NewGuid())
-            .Take(10)
+            .Where(listing => featuredListingIds.Contains(listing.Id))
             .ToListAsync();
+
+        var featuredListingOrder = featuredListingIds
+            .Select((id, index) => new { id, index })
+            .ToDictionary(item => item.id, item => item.index);
+
+        featuredListings = featuredListings
+            .OrderBy(listing => featuredListingOrder[listing.Id])
+            .ToList();
 
         return Ok(new CatalogHomeResponse
         {

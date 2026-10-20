@@ -186,18 +186,35 @@ public sealed class StripePaymentService
     {
         EnsureConfigured();
 
+        if (string.IsNullOrWhiteSpace(order.StripePaymentIntentId))
+        {
+            throw new InvalidOperationException("The order has no Stripe payment intent.");
+        }
+
+        var paymentIntent = await new PaymentIntentService().GetAsync(
+            order.StripePaymentIntentId,
+            cancellationToken: cancellationToken);
+
+        if (string.IsNullOrWhiteSpace(paymentIntent.LatestChargeId))
+        {
+            throw new InvalidOperationException("The Stripe payment has no source charge yet.");
+        }
+
         var transfer = await new TransferService().CreateAsync(
             new TransferCreateOptions
             {
                 Amount = amountInCents,
                 Currency = "usd",
                 Destination = connectedAccountId,
+                SourceTransaction = paymentIntent.LatestChargeId,
                 Metadata = new Dictionary<string, string>
                 {
                     ["order_id"] = order.Id.ToString()
                 }
             },
-            new RequestOptions { IdempotencyKey = $"bse-transfer-{order.Id}" },
+            // Use a new key after switching to source_transaction. Stripe can retain
+            // the result of an earlier failed request under the old idempotency key.
+            new RequestOptions { IdempotencyKey = $"bse-transfer-v2-{order.Id}" },
             cancellationToken);
 
         return transfer.Id;

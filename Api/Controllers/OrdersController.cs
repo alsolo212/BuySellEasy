@@ -19,15 +19,18 @@ public class OrdersController : ControllerBase
 {
     private readonly ProductDbContext _dbContext;
     private readonly OrderPaymentLifecycleService _lifecycle;
+    private readonly OrderRealtimeNotifier _orderRealtime;
     private readonly StripePaymentService _stripe;
 
     public OrdersController(
         ProductDbContext dbContext,
         OrderPaymentLifecycleService lifecycle,
+        OrderRealtimeNotifier orderRealtime,
         StripePaymentService stripe)
     {
         _dbContext = dbContext;
         _lifecycle = lifecycle;
+        _orderRealtime = orderRealtime;
         _stripe = stripe;
     }
 
@@ -66,6 +69,7 @@ public class OrdersController : ControllerBase
         await UpdateOwnerListingCountAsync(listing.OwnerId);
 
         var created = await LoadOrderAsync(order.Id);
+        await _orderRealtime.NotifyAsync(created, "created");
         return CreatedAtAction(nameof(GetOrderById), new { id = order.Id }, MarketplaceMapper.MapOrderDetails(created));
     }
 
@@ -137,6 +141,11 @@ public class OrdersController : ControllerBase
             .Include(order => order.Shipment)
             .ToListAsync();
 
+        foreach (var createdOrder in orders)
+        {
+            await _orderRealtime.NotifyAsync(createdOrder, "created");
+        }
+
         return Ok(new CheckoutCartResponse
         {
             Orders = orders.Select(MarketplaceMapper.MapOrderDetails).ToArray(),
@@ -193,6 +202,7 @@ public class OrdersController : ControllerBase
         await UpdateOwnerListingCountAsync(order.Listing.OwnerId);
 
         var updated = await LoadOrderAsync(order.Id);
+        await _orderRealtime.NotifyAsync(updated);
         return Ok(MarketplaceMapper.MapOrderDetails(updated));
     }
 
@@ -231,6 +241,7 @@ public class OrdersController : ControllerBase
         await UpdateOwnerListingCountAsync(order.Listing.OwnerId);
 
         var updated = await LoadOrderAsync(order.Id);
+        await _orderRealtime.NotifyAsync(updated);
         return Ok(MarketplaceMapper.MapOrderDetails(updated));
     }
 
@@ -295,6 +306,7 @@ public class OrdersController : ControllerBase
         await UpdateOwnerListingCountAsync(order.Listing.OwnerId);
 
         var updated = await LoadOrderAsync(order.Id);
+        await _orderRealtime.NotifyAsync(updated);
         return Ok(MarketplaceMapper.MapOrderDetails(updated));
     }
 
@@ -323,6 +335,7 @@ public class OrdersController : ControllerBase
         await UpdateOwnerListingCountAsync(order.Listing.OwnerId);
 
         var updated = await LoadOrderAsync(order.Id);
+        await _orderRealtime.NotifyAsync(updated);
         return Ok(MarketplaceMapper.MapOrderDetails(updated));
     }
 

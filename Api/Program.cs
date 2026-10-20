@@ -49,5 +49,6 @@ if (Directory.Exists(categoryImagesPath))
 
 app.MapControllers();
 app.MapHub<ChatHub>("/hubs/chat");
+app.MapHub<OrderHub>("/hubs/orders");
 
 app.Run();
