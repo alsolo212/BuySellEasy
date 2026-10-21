@@ -7,6 +7,8 @@ using Domain.Enums;
 using Domain.IdentityEntities;
 using Infrastructure.DbContextt;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using StripeApiConfiguration = Stripe.StripeConfiguration;
 using StripeEventUtility = Stripe.EventUtility;
@@ -170,6 +172,27 @@ public sealed class SecurityIntegrationTests : IClassFixture<TestApplicationFact
         Assert.Equal(HttpStatusCode.NotFound, denied.StatusCode);
         Assert.Equal(HttpStatusCode.OK, allowed.StatusCode);
         Assert.Equal("nosniff", allowed.Headers.GetValues("X-Content-Type-Options").Single());
+    }
+
+    [Fact]
+    public async Task Global_rate_limit_rejects_anonymous_request_floods()
+    {
+        using var rateLimitedFactory = _factory.WithWebHostBuilder(builder =>
+            builder.ConfigureAppConfiguration((_, configuration) =>
+                configuration.AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["DdosProtection:RequestsPerMinute"] = "60",
+                    ["DdosProtection:BurstSize"] = "1"
+                })));
+        using var client = rateLimitedFactory.CreateClient();
+
+        var responses = await Task.WhenAll(Enumerable.Range(0, 12)
+            .Select(_ => client.GetAsync("/api/catalog/categories")));
+
+        Assert.Contains(responses, response => response.StatusCode == HttpStatusCode.OK);
+        var rejected = responses.First(response =>
+            response.StatusCode == HttpStatusCode.TooManyRequests);
+        Assert.Equal("application/problem+json", rejected.Content.Headers.ContentType?.MediaType);
     }
 
     private HttpClient CreateAuthenticatedClient(Guid userId)

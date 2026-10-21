@@ -51,10 +51,34 @@ public static class ApiServiceCollectionExtensions
 
         services.AddRateLimiter(options =>
         {
+            var ddosProtection = configuration
+                .GetSection(DdosProtectionOptions.SectionName)
+                .Get<DdosProtectionOptions>() ?? new DdosProtectionOptions();
+            var requestsPerMinute = Math.Clamp(ddosProtection.RequestsPerMinute, 60, 10_000);
+            var burstSize = Math.Clamp(ddosProtection.BurstSize, 1, requestsPerMinute);
             var supportBotRequestsPerMinute = Math.Clamp(
                 configuration.GetValue<int?>("SupportBot:RequestsPerMinute") ?? 20,
                 1,
                 120);
+
+            // This policy applies to every request, including endpoints that do
+            // not have a more specific policy. The key is the actual socket IP,
+            // or the client IP supplied by a configured, trusted reverse proxy.
+            // A zero-length queue ensures a flood is rejected instead of tying
+            // up request workers waiting for a permit.
+            options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
+                RateLimitPartition.GetTokenBucketLimiter(
+                    GetClientPartitionKey(context),
+                    _ => new TokenBucketRateLimiterOptions
+                    {
+                        TokenLimit = burstSize,
+                        TokensPerPeriod = Math.Max(1, (int)Math.Ceiling(requestsPerMinute / 60d)),
+                        ReplenishmentPeriod = TimeSpan.FromSeconds(1),
+                        QueueLimit = 0,
+                        QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                        AutoReplenishment = true
+                    }));
+
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
             options.OnRejected = async (context, cancellationToken) =>
             {
@@ -63,14 +87,19 @@ public static class ApiServiceCollectionExtensions
                     return;
                 }
 
-                context.HttpContext.Response.ContentType = "application/problem+json";
+                if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+                {
+                    context.HttpContext.Response.Headers.RetryAfter =
+                        Math.Max(1, Math.Ceiling(retryAfter.TotalSeconds)).ToString();
+                }
+
                 await context.HttpContext.Response.WriteAsJsonAsync(new ProblemDetails
                 {
                     Status = StatusCodes.Status429TooManyRequests,
                     Title = "Too many requests",
                     Detail = "Please try again later.",
                     Instance = context.HttpContext.Request.Path
-                }, cancellationToken);
+                }, options: null, contentType: "application/problem+json", cancellationToken: cancellationToken);
             };
 
             options.AddPolicy(AuthRateLimitPolicyName, context =>
