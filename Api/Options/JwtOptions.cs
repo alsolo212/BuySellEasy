@@ -10,5 +10,15 @@ public class JwtOptions
 
     public string SecretKey { get; set; } = string.Empty;
 
-    public int AccessTokenLifetimeMinutes { get; set; } = 120;
+    public int AccessTokenLifetimeMinutes { get; set; } = 15;
+
+    public int RefreshTokenLifetimeDays { get; set; } = 14;
+
+    public int RefreshTokenAbsoluteLifetimeDays { get; set; } = 30;
+
+    public string RefreshTokenCookieName { get; set; } = "bse_refresh_token";
+
+    public bool RefreshTokenCookieSecure { get; set; }
+
+    public string RefreshTokenCookieSameSite { get; set; } = "Lax";
 }

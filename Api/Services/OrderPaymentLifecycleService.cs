@@ -256,8 +256,15 @@ public sealed class OrderPaymentLifecycleService
         Guid paymentSessionId,
         CancellationToken cancellationToken)
     {
-        return await _dbContext.PaymentSessions
-            .FromSqlInterpolated($"SELECT * FROM \"PaymentSessions\" WHERE \"Id\" = {paymentSessionId} FOR UPDATE")
+        // PostgreSQL uses a row lock to serialize concurrent webhook deliveries.
+        // SQLite is used only by the in-process integration suite and does not
+        // support FOR UPDATE; its transaction still verifies the idempotency path.
+        IQueryable<PaymentSession> query = _dbContext.Database.IsNpgsql()
+            ? _dbContext.PaymentSessions.FromSqlInterpolated(
+                $"SELECT * FROM \"PaymentSessions\" WHERE \"Id\" = {paymentSessionId} FOR UPDATE")
+            : _dbContext.PaymentSessions.Where(item => item.Id == paymentSessionId);
+
+        return await query
             .Include(item => item.Buyer)
             .SingleOrDefaultAsync(cancellationToken);
     }

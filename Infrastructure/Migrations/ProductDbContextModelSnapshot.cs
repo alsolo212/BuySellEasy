@@ -723,6 +723,57 @@ namespace Infrastructure.MigrationsPostgres
                     b.ToTable("Shipments", (string)null);
                 });
 
+            modelBuilder.Entity("Domain.IdentityEntities.RefreshToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("AbsoluteExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedByIp")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime>("ExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("FamilyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ReplacedByTokenHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime?>("RevokedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("RevokedByIp")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique();
+
+                    b.HasIndex("UserId", "FamilyId");
+
+                    b.ToTable("RefreshTokens", (string)null);
+                });
+
             modelBuilder.Entity("Domain.IdentityEntities.Role", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1191,6 +1242,17 @@ namespace Infrastructure.MigrationsPostgres
                     b.Navigation("Order");
                 });
 
+            modelBuilder.Entity("Domain.IdentityEntities.RefreshToken", b =>
+                {
+                    b.HasOne("Domain.IdentityEntities.User", "User")
+                        .WithMany("RefreshTokens")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>
                 {
                     b.HasOne("Domain.IdentityEntities.Role", null)
@@ -1298,6 +1360,8 @@ namespace Infrastructure.MigrationsPostgres
                     b.Navigation("PurchaseOrders");
 
                     b.Navigation("ReceivedReviews");
+
+                    b.Navigation("RefreshTokens");
 
                     b.Navigation("SalesOrders");
 

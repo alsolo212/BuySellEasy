@@ -39,17 +39,16 @@ public class ListingsController : ControllerBase
         [FromQuery] ListingStatus? status,
         [FromQuery] Guid? ownerId,
         [FromQuery] string? sortBy,
-        [FromQuery] bool includeHidden = false)
+        [FromQuery] bool includeHidden = false,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = PaginationExtensions.DefaultPageSize)
     {
+        (page, pageSize) = PaginationExtensions.Normalize(page, pageSize);
         var currentUserId = User.Identity?.IsAuthenticated == true ? User.GetRequiredUserId() : (Guid?)null;
         var canSeeHidden = includeHidden &&
             (User.IsElevatedAdmin() || ownerId.HasValue && ownerId.Value == currentUserId);
         var query = _dbContext.Listings
             .AsNoTracking()
-            .Include(listing => listing.Category)
-            .Include(listing => listing.Owner)
-            .Include(listing => listing.Images)
-            .Include(listing => listing.Orders)
             .AsQueryable();
 
         if (!canSeeHidden)
@@ -103,26 +102,39 @@ public class ListingsController : ControllerBase
             _ => query.OrderByDescending(listing => listing.CreatedAtUtc)
         };
 
-        var listings = await query.ToListAsync();
-        return Ok(listings.Select(MarketplaceMapper.MapListingSummary).ToArray());
+        var totalCount = await query.CountAsync();
+        var listings = await query
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(MarketplaceMapper.ListingSummaryProjection)
+            .ToArrayAsync();
+
+        Response.AddPaginationHeaders(page, pageSize, totalCount);
+        return Ok(listings);
     }
 
     [Authorize]
     [HttpGet("mine")]
-    public async Task<ActionResult<IReadOnlyCollection<ListingSummaryResponse>>> GetMyListings()
+    public async Task<ActionResult<IReadOnlyCollection<ListingSummaryResponse>>> GetMyListings(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = PaginationExtensions.DefaultPageSize)
     {
+        (page, pageSize) = PaginationExtensions.Normalize(page, pageSize);
         var userId = User.GetRequiredUserId();
-        var listings = await _dbContext.Listings
+        var query = _dbContext.Listings
             .AsNoTracking()
-            .Include(listing => listing.Category)
-            .Include(listing => listing.Owner)
-            .Include(listing => listing.Images)
-            .Include(listing => listing.Orders)
             .Where(listing => listing.OwnerId == userId)
-            .OrderByDescending(listing => listing.CreatedAtUtc)
-            .ToListAsync();
+            .OrderByDescending(listing => listing.CreatedAtUtc);
 
-        return Ok(listings.Select(MarketplaceMapper.MapListingSummary).ToArray());
+        var totalCount = await query.CountAsync();
+        var listings = await query
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(MarketplaceMapper.ListingSummaryProjection)
+            .ToArrayAsync();
+
+        Response.AddPaginationHeaders(page, pageSize, totalCount);
+        return Ok(listings);
     }
 
     [HttpGet("{id:guid}")]

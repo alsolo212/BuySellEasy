@@ -24,17 +24,20 @@ public class AuthController : ControllerBase
     private readonly SignInManager<User> _signInManager;
     private readonly IJwtTokenService _jwtTokenService;
     private readonly GoogleAuthOptions _googleAuthOptions;
+    private readonly JwtOptions _jwtOptions;
 
     public AuthController(
         UserManager<User> userManager,
         SignInManager<User> signInManager,
         IJwtTokenService jwtTokenService,
-        IOptions<GoogleAuthOptions> googleAuthOptions)
+        IOptions<GoogleAuthOptions> googleAuthOptions,
+        IOptions<JwtOptions> jwtOptions)
     {
         _userManager = userManager;
         _signInManager = signInManager;
         _jwtTokenService = jwtTokenService;
         _googleAuthOptions = googleAuthOptions.Value;
+        _jwtOptions = jwtOptions.Value;
     }
 
     [HttpPost("register")]
@@ -120,6 +123,15 @@ public class AuthController : ControllerBase
         await _userManager.UpdateAsync(user);
 
         return Ok(await BuildAuthResponseAsync(user));
+    }
+
+    [AllowAnonymous]
+    [HttpGet("google-config")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public ActionResult<object> GoogleConfiguration()
+    {
+        // OAuth client IDs are public by design. Secrets are never returned here.
+        return Ok(new { clientId = _googleAuthOptions.ClientId });
     }
 
     [HttpPost("google")]
@@ -242,6 +254,43 @@ public class AuthController : ControllerBase
         return Ok(await BuildAuthResponseAsync(user));
     }
 
+    [AllowAnonymous]
+    [HttpPost("refresh")]
+    [EnableRateLimiting(ApiServiceCollectionExtensions.AuthRateLimitPolicyName)]
+    [ProducesResponseType(typeof(AuthResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<AuthResponse>> Refresh(CancellationToken cancellationToken)
+    {
+        var refreshToken = Request.Cookies[_jwtOptions.RefreshTokenCookieName];
+        var session = await _jwtTokenService.RotateRefreshTokenAsync(
+            refreshToken ?? string.Empty,
+            HttpContext.Connection.RemoteIpAddress?.ToString(),
+            cancellationToken);
+
+        if (session is null)
+        {
+            DeleteRefreshTokenCookie();
+            return InvalidSession();
+        }
+
+        return Ok(await BuildAuthResponseAsync(session));
+    }
+
+    [AllowAnonymous]
+    [HttpPost("logout")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> Logout(CancellationToken cancellationToken)
+    {
+        var refreshToken = Request.Cookies[_jwtOptions.RefreshTokenCookieName];
+        await _jwtTokenService.RevokeRefreshTokenAsync(
+            refreshToken ?? string.Empty,
+            HttpContext.Connection.RemoteIpAddress?.ToString(),
+            cancellationToken);
+
+        DeleteRefreshTokenCookie();
+        return NoContent();
+    }
+
     [Authorize]
     [HttpPost("password")]
     [ProducesResponseType(typeof(UserSummaryResponse), StatusCodes.Status200OK)]
@@ -299,21 +348,31 @@ public class AuthController : ControllerBase
 
     private async Task<AuthResponse> BuildAuthResponseAsync(User user)
     {
-        var roles = await _userManager.GetRolesAsync(user);
-        var (token, expiresAtUtc) = await _jwtTokenService.CreateTokenAsync(user);
+        var session = await _jwtTokenService.CreateSessionAsync(
+            user,
+            HttpContext.Connection.RemoteIpAddress?.ToString(),
+            HttpContext.RequestAborted);
+
+        return await BuildAuthResponseAsync(session);
+    }
+
+    private async Task<AuthResponse> BuildAuthResponseAsync(AuthSessionTokens session)
+    {
+        var roles = await _userManager.GetRolesAsync(session.User);
+        SetRefreshTokenCookie(session.RefreshToken, session.RefreshTokenExpiresAtUtc);
 
         return new AuthResponse
         {
-            AccessToken = token,
-            ExpiresAtUtc = expiresAtUtc,
+            AccessToken = session.AccessToken,
+            ExpiresAtUtc = session.AccessTokenExpiresAtUtc,
             User = new UserSummaryResponse
             {
-                Id = user.Id,
-                UserName = user.UserName ?? string.Empty,
-                Email = user.Email ?? string.Empty,
+                Id = session.User.Id,
+                UserName = session.User.UserName ?? string.Empty,
+                Email = session.User.Email ?? string.Empty,
                 Roles = roles.ToArray(),
-                ProfileImageUrl = user.ProfileImageUrl,
-                HasPassword = !string.IsNullOrWhiteSpace(user.PasswordHash)
+                ProfileImageUrl = session.User.ProfileImageUrl,
+                HasPassword = !string.IsNullOrWhiteSpace(session.User.PasswordHash)
             }
         };
     }
@@ -336,6 +395,46 @@ public class AuthController : ControllerBase
     private static UnauthorizedObjectResult InvalidCredentials()
     {
         return new UnauthorizedObjectResult(new { message = "Invalid email or password." });
+    }
+
+    private static UnauthorizedObjectResult InvalidSession()
+    {
+        return new UnauthorizedObjectResult(new { message = "The session is no longer valid." });
+    }
+
+    private void SetRefreshTokenCookie(string refreshToken, DateTime expiresAtUtc)
+    {
+        Response.Cookies.Append(_jwtOptions.RefreshTokenCookieName, refreshToken, new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = _jwtOptions.RefreshTokenCookieSecure || Request.IsHttps,
+            SameSite = ParseSameSiteMode(_jwtOptions.RefreshTokenCookieSameSite),
+            Path = "/api/auth",
+            Expires = expiresAtUtc,
+            IsEssential = true
+        });
+    }
+
+    private void DeleteRefreshTokenCookie()
+    {
+        Response.Cookies.Delete(_jwtOptions.RefreshTokenCookieName, new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = _jwtOptions.RefreshTokenCookieSecure || Request.IsHttps,
+            SameSite = ParseSameSiteMode(_jwtOptions.RefreshTokenCookieSameSite),
+            Path = "/api/auth",
+            IsEssential = true
+        });
+    }
+
+    private static SameSiteMode ParseSameSiteMode(string? value)
+    {
+        return value?.Trim().ToLowerInvariant() switch
+        {
+            "none" => SameSiteMode.None,
+            "strict" => SameSiteMode.Strict,
+            _ => SameSiteMode.Lax
+        };
     }
 
     private async Task<string> BuildUniqueUserNameAsync(string? displayName, string email)

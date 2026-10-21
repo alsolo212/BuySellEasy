@@ -45,8 +45,11 @@ public class ChatsController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<IReadOnlyCollection<ChatSummaryResponse>>> GetMyChats(
         [FromQuery] Guid? userId = null,
-        [FromQuery] bool supportOnly = false)
+        [FromQuery] bool supportOnly = false,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = PaginationExtensions.DefaultPageSize)
     {
+        (page, pageSize) = PaginationExtensions.Normalize(page, pageSize);
         var currentUserId = User.GetRequiredUserId();
         var targetUserId = userId.HasValue && User.IsElevatedAdmin() ? userId.Value : currentUserId;
         var isViewingAnotherUsersChats = targetUserId != currentUserId;
@@ -56,8 +59,7 @@ public class ChatsController : ControllerBase
                 .ThenInclude(listing => listing!.Images)
             .Include(chat => chat.Buyer)
             .Include(chat => chat.Seller)
-            .Include(chat => chat.AssignedAdmin)
-            .Include(chat => chat.Messages);
+            .Include(chat => chat.AssignedAdmin);
 
         if (supportOnly)
         {
@@ -93,11 +95,50 @@ public class ChatsController : ControllerBase
                 chat.BuyerId == targetUserId || chat.SellerId == targetUserId);
         }
 
+        var totalCount = await chatsQuery.CountAsync();
         var chats = await chatsQuery
             .OrderByDescending(chat => chat.LastMessageAtUtc)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .ToListAsync();
 
-        return Ok(chats.Select(chat => MarketplaceMapper.MapChatSummary(chat, targetUserId)).ToArray());
+        var chatIds = chats.Select(chat => chat.Id).ToArray();
+        var messageSummaries = await _dbContext.Messages
+            .AsNoTracking()
+            .Where(message => chatIds.Contains(message.ChatId))
+            .GroupBy(message => message.ChatId)
+            .Select(group => new
+            {
+                ChatId = group.Key,
+                HasLastMessage = group.Any(),
+                LastMessageContent = group
+                    .OrderByDescending(message => message.SentAtUtc)
+                    .Select(message => message.Content)
+                    .FirstOrDefault(),
+                LastMessageType = group
+                    .OrderByDescending(message => message.SentAtUtc)
+                    .Select(message => (MessageType?)message.Type)
+                    .FirstOrDefault(),
+                UnreadCount = group.Count(message =>
+                    message.SenderId != currentUserId && message.ReadAtUtc == null)
+            })
+            .ToDictionaryAsync(item => item.ChatId, cancellationToken: HttpContext.RequestAborted);
+
+        Response.AddPaginationHeaders(page, pageSize, totalCount);
+        return Ok(chats.Select(chat =>
+        {
+            messageSummaries.TryGetValue(chat.Id, out var summary);
+            return MarketplaceMapper.MapChatSummary(
+                chat,
+                targetUserId,
+                summary is null
+                    ? null
+                    : new MarketplaceMapper.ChatSummaryMessageData(
+                        summary.HasLastMessage,
+                        summary.LastMessageContent,
+                        summary.LastMessageType,
+                        summary.UnreadCount));
+        }).ToArray());
     }
 
     [HttpPost]
@@ -287,18 +328,17 @@ public class ChatsController : ControllerBase
     }
 
     [HttpGet("{id:guid}/messages")]
-    public async Task<ActionResult<IReadOnlyCollection<MessageResponse>>> GetMessages(Guid id)
+    public async Task<ActionResult<IReadOnlyCollection<MessageResponse>>> GetMessages(
+        Guid id,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 100,
+        CancellationToken cancellationToken = default)
     {
+        (page, pageSize) = PaginationExtensions.Normalize(page, pageSize);
         var userId = User.GetRequiredUserId();
         var chat = await _dbContext.Chats
-            .Include(item => item.Listing)
-                .ThenInclude(listing => listing!.Images)
-            .Include(item => item.Buyer)
-            .Include(item => item.Seller)
-            .Include(item => item.AssignedAdmin)
-            .Include(item => item.Messages)
-                .ThenInclude(message => message.Sender)
-            .FirstOrDefaultAsync(item => item.Id == id)
+            .AsNoTracking()
+            .FirstOrDefaultAsync(item => item.Id == id, cancellationToken)
             ?? throw new KeyNotFoundException("Chat was not found.");
 
         if (!CanAccessChat(chat, userId))
@@ -306,29 +346,45 @@ public class ChatsController : ControllerBase
             return Forbid();
         }
 
-        var unreadIncomingMessages = chat.Messages
-            .Where(message => message.SenderId != userId && message.ReadAtUtc is null)
-            .ToList();
+        var readAtUtc = DateTime.UtcNow;
+        var markedRead = await _dbContext.Messages
+            .Where(message =>
+                message.ChatId == id &&
+                message.SenderId != userId &&
+                message.ReadAtUtc == null)
+            .ExecuteUpdateAsync(
+                setters => setters.SetProperty(message => message.ReadAtUtc, readAtUtc),
+                cancellationToken);
 
-        if (unreadIncomingMessages.Count > 0)
+        if (markedRead > 0)
         {
-            var readAtUtc = DateTime.UtcNow;
-            foreach (var message in unreadIncomingMessages)
+            var updatedChat = await LoadChatAsync(id);
+            if (updatedChat is not null)
             {
-                message.ReadAtUtc = readAtUtc;
+                await BroadcastChatSummariesAsync(updatedChat);
             }
-
-            await _dbContext.SaveChangesAsync();
-            await BroadcastChatSummariesAsync(chat);
         }
 
-        return Ok(chat.Messages
+        var totalCount = await _dbContext.Messages
+            .CountAsync(message => message.ChatId == id, cancellationToken);
+        var messages = await _dbContext.Messages
+            .AsNoTracking()
+            .Where(message => message.ChatId == id)
+            .OrderByDescending(message => message.SentAtUtc)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Include(message => message.Sender)
+            .ToArrayAsync(cancellationToken);
+
+        Response.AddPaginationHeaders(page, pageSize, totalCount);
+        return Ok(messages
             .OrderBy(message => message.SentAtUtc)
             .Select(MarketplaceMapper.MapMessage)
             .ToArray());
     }
 
     [HttpPost("{id:guid}/messages")]
+    [EnableRateLimiting(ApiServiceCollectionExtensions.SupportBotRateLimitPolicyName)]
     public async Task<ActionResult<MessageResponse>> SendMessage(
         Guid id,
         [FromBody] SendMessageRequest request,

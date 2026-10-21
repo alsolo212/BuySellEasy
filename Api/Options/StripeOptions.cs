@@ -10,7 +10,7 @@ public class StripeOptions
 
     public string WebhookSecret { get; set; } = string.Empty;
 
-    public string FrontendBaseUrl { get; set; } = "http://localhost:4200";
+    public string FrontendBaseUrl { get; set; } = string.Empty;
 
     public string ConnectCountry { get; set; } = "US";
 }

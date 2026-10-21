@@ -9,11 +9,42 @@ using Api.Contracts.Users;
 using Domain.Entities;
 using Domain.Enums;
 using Domain.IdentityEntities;
+using System.Linq.Expressions;
 
 namespace Api.Mappers;
 
 public static class MarketplaceMapper
 {
+    public static Expression<Func<Listing, ListingSummaryResponse>> ListingSummaryProjection => listing => new ListingSummaryResponse
+    {
+        Id = listing.Id,
+        Title = listing.Title,
+        Price = listing.Price,
+        Quantity = Math.Max(0, listing.Quantity - listing.ReservedQuantity),
+        IsNegotiable = listing.IsNegotiable,
+        City = listing.City,
+        Condition = listing.Condition,
+        Status = listing.Status,
+        HasActiveOrders = listing.Orders.Any(order =>
+            order.Status != OrderStatus.Declined &&
+            order.Status != OrderStatus.Cancelled &&
+            order.Status != OrderStatus.Delivered),
+        CategoryId = listing.CategoryId,
+        CategoryName = listing.Category.Name ?? string.Empty,
+        PrimaryImageUrl = listing.Images
+            .OrderBy(image => image.SortOrder)
+            .Select(image => image.Url)
+            .FirstOrDefault(),
+        CreatedAtUtc = listing.CreatedAtUtc,
+        Owner = new ListingOwnerResponse
+        {
+            Id = listing.Owner.Id,
+            UserName = listing.Owner.UserName ?? string.Empty,
+            ProfileImageUrl = listing.Owner.ProfileImageUrl,
+            IsVerified = listing.Owner.IsVerified
+        }
+    };
+
     public static CategoryListItemResponse MapCategory(Category category) => new()
     {
         Id = category.Id,
@@ -221,7 +252,10 @@ public static class MarketplaceMapper
         Shipment = order.Shipment is null ? null : MapShipment(order.Shipment)
     };
 
-    public static ChatSummaryResponse MapChatSummary(Chat chat, Guid currentUserId)
+    public static ChatSummaryResponse MapChatSummary(
+        Chat chat,
+        Guid currentUserId,
+        ChatSummaryMessageData? messageData = null)
     {
         var currentUserIsElevatedAdmin = chat.BuyerId != currentUserId && chat.SellerId != currentUserId;
         var currentUserIsSupportAgent = chat.IsSupport && chat.BuyerId != currentUserId;
@@ -230,20 +264,22 @@ public static class MarketplaceMapper
             : chat.BuyerId == currentUserId
                 ? chat.Seller
                 : chat.Buyer;
-        var lastMessage = chat.Messages
-            .OrderByDescending(message => message.SentAtUtc)
-            .FirstOrDefault();
-        var unreadCount = chat.Messages.Count(message =>
+        var lastMessage = messageData is null
+            ? chat.Messages.OrderByDescending(message => message.SentAtUtc).FirstOrDefault()
+            : null;
+        var lastMessageContent = messageData?.LastMessageContent ?? lastMessage?.Content;
+        var lastMessageType = messageData?.LastMessageType ?? lastMessage?.Type;
+        var unreadCount = messageData?.UnreadCount ?? chat.Messages.Count(message =>
             message.SenderId != currentUserId &&
             message.ReadAtUtc is null);
-        var lastMessagePreview = string.IsNullOrWhiteSpace(lastMessage?.Content)
-            ? lastMessage?.Type switch
+        var lastMessagePreview = string.IsNullOrWhiteSpace(lastMessageContent)
+            ? lastMessageType switch
             {
                 MessageType.Image => "Image",
                 MessageType.File => "File",
                 _ => string.Empty
             }
-            : lastMessage!.Content;
+            : lastMessageContent;
 
         return new ChatSummaryResponse
         {
@@ -292,6 +328,12 @@ public static class MarketplaceMapper
         SentAtUtc = message.SentAtUtc,
         ReadAtUtc = message.ReadAtUtc
     };
+
+    public sealed record ChatSummaryMessageData(
+        bool HasLastMessage,
+        string? LastMessageContent,
+        MessageType? LastMessageType,
+        int UnreadCount);
 
     public static ReviewResponse MapReview(Review review) => new()
     {

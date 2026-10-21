@@ -24,6 +24,7 @@ public static class ApiServiceCollectionExtensions
     public const string FrontendCorsPolicyName = "Frontend";
     public const string AuthRateLimitPolicyName = "auth-endpoints";
     public const string FileUploadRateLimitPolicyName = "file-uploads";
+    public const string SupportBotRateLimitPolicyName = "support-bot";
 
     public static IServiceCollection AddApiServices(this IServiceCollection services, IConfiguration configuration)
     {
@@ -50,6 +51,10 @@ public static class ApiServiceCollectionExtensions
 
         services.AddRateLimiter(options =>
         {
+            var supportBotRequestsPerMinute = Math.Clamp(
+                configuration.GetValue<int?>("SupportBot:RequestsPerMinute") ?? 20,
+                1,
+                120);
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
             options.OnRejected = async (context, cancellationToken) =>
             {
@@ -89,6 +94,20 @@ public static class ApiServiceCollectionExtensions
                         QueueLimit = 0,
                         AutoReplenishment = true
                     }));
+
+            // Support replies are invoked by the chat-message endpoint. Applying
+            // this per-account limit there prevents a user from repeatedly
+            // invoking the local model while remaining generous for normal chat.
+            options.AddPolicy(SupportBotRateLimitPolicyName, context =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    GetAuthenticatedClientPartitionKey(context),
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = supportBotRequestsPerMinute,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueLimit = 0,
+                        AutoReplenishment = true
+                    }));
         });
 
         services.Configure<ApiBehaviorOptions>(options =>
@@ -114,13 +133,18 @@ public static class ApiServiceCollectionExtensions
         {
             options.AddPolicy(FrontendCorsPolicyName, policy =>
             {
-                var origins = configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? ["http://localhost:4200"];
+                var origins = (configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? Array.Empty<string>())
+                    .Select(origin => origin.Trim().TrimEnd('/'))
+                    .Where(origin => !string.IsNullOrWhiteSpace(origin))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToArray();
 
                 policy
                     .WithOrigins(origins)
                     .AllowAnyHeader()
                     .AllowAnyMethod()
-                    .AllowCredentials();
+                    .AllowCredentials()
+                    .WithExposedHeaders("X-Request-Id", "X-Total-Count", "X-Page", "X-Page-Size");
             });
         });
 
@@ -202,7 +226,7 @@ public static class ApiServiceCollectionExtensions
         services.AddHttpClient<SupportBotService>((serviceProvider, client) =>
         {
             var options = serviceProvider.GetRequiredService<IOptions<SupportBotOptions>>().Value;
-            client.Timeout = TimeSpan.FromSeconds(Math.Clamp(options.TimeoutSeconds, 5, 300));
+            client.Timeout = TimeSpan.FromSeconds(Math.Clamp(options.TimeoutSeconds, 5, 60));
         });
 
         return services;

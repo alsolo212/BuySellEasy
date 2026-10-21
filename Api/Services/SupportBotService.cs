@@ -83,10 +83,7 @@ public sealed class SupportBotService
             return knowledgeBaseAnswer;
         }
 
-        var recentHistory = messages
-            .TakeLast(24)
-            .Where(message => !string.IsNullOrWhiteSpace(message.Content))
-            .ToArray();
+        var recentHistory = LimitHistory(messages);
 
         var latestUserMessage = recentHistory
             .LastOrDefault(message => message.IsFromUser)
@@ -111,16 +108,16 @@ public sealed class SupportBotService
                 options.Model,
                 [new OllamaChatMessage("system", systemPrompt), .. recentMessages],
                 false,
-                new OllamaGenerationOptions(0.2, 0.9, 4096))
+                CreateGenerationOptions())
             : new OllamaGenerateRequest(
                 options.Model,
                 BuildCompletionPrompt(recentMessages, language),
                 systemPrompt,
                 false,
-                new OllamaGenerationOptions(0.2, 0.9, 4096));
+                CreateGenerationOptions());
 
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeout.CancelAfter(TimeSpan.FromSeconds(Math.Clamp(options.TimeoutSeconds, 5, 300)));
+        timeout.CancelAfter(TimeSpan.FromSeconds(Math.Clamp(options.TimeoutSeconds, 5, 60)));
 
         try
         {
@@ -156,7 +153,7 @@ public sealed class SupportBotService
                     : OutOfScopeMessage;
             }
 
-            return content[..Math.Min(content.Length, 4000)];
+            return content[..Math.Min(content.Length, Math.Clamp(options.MaxResponseCharacters, 128, 4000))];
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
@@ -195,7 +192,48 @@ public sealed class SupportBotService
     private sealed record OllamaGenerationOptions(
         double Temperature,
         [property: JsonPropertyName("top_p")] double TopP,
-        [property: JsonPropertyName("num_ctx")] int ContextLength);
+        [property: JsonPropertyName("num_ctx")] int ContextLength,
+        [property: JsonPropertyName("num_predict")] int MaxResponseTokens);
+
+    private OllamaGenerationOptions CreateGenerationOptions()
+    {
+        return new OllamaGenerationOptions(
+            Temperature: 0.2,
+            TopP: 0.9,
+            ContextLength: Math.Clamp(options.MaxContextTokens, 512, 4096),
+            MaxResponseTokens: Math.Clamp(options.MaxResponseTokens, 64, 1024));
+    }
+
+    private IReadOnlyCollection<SupportBotHistoryMessage> LimitHistory(
+        IReadOnlyCollection<SupportBotHistoryMessage> messages)
+    {
+        var maxMessages = Math.Clamp(options.MaxHistoryMessages, 1, 32);
+        var remainingCharacters = Math.Clamp(options.MaxContextCharacters, 512, 12000);
+        var limitedNewestFirst = new List<SupportBotHistoryMessage>();
+
+        foreach (var message in messages
+                     .Where(message => !string.IsNullOrWhiteSpace(message.Content))
+                     .TakeLast(maxMessages)
+                     .Reverse())
+        {
+            if (remainingCharacters <= 0)
+            {
+                break;
+            }
+
+            var content = message.Content.Trim();
+            if (content.Length > remainingCharacters)
+            {
+                content = content[..remainingCharacters];
+            }
+
+            limitedNewestFirst.Add(new SupportBotHistoryMessage(message.IsFromUser, content));
+            remainingCharacters -= content.Length;
+        }
+
+        limitedNewestFirst.Reverse();
+        return limitedNewestFirst;
+    }
 
     private sealed class OllamaGenerateResponse
     {

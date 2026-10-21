@@ -4,8 +4,28 @@ using Api.Hubs;
 using Api.Middleware;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
+using Microsoft.AspNetCore.HttpOverrides;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
+
+if (!builder.Environment.IsDevelopment() && !builder.Environment.IsEnvironment("Testing"))
+{
+    var allowedHosts = builder.Configuration["AllowedHosts"];
+    var allowedOrigins = (builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [])
+        .Where(origin => !string.IsNullOrWhiteSpace(origin))
+        .ToArray();
+    var jwtSecretKey = builder.Configuration["Jwt:SecretKey"];
+    if (string.IsNullOrWhiteSpace(allowedHosts) ||
+        allowedHosts == "*" ||
+        allowedOrigins.Length == 0 ||
+        string.IsNullOrWhiteSpace(jwtSecretKey) ||
+        Encoding.UTF8.GetByteCount(jwtSecretKey) < 32)
+    {
+        throw new InvalidOperationException(
+            "Production requires explicit AllowedHosts, Cors:AllowedOrigins and a JWT secret of at least 32 bytes.");
+    }
+}
 
 builder.Services.AddApiServices(builder.Configuration);
 
@@ -18,12 +38,22 @@ using (var scope = app.Services.CreateScope())
         var dbContext = scope.ServiceProvider.GetRequiredService<ProductDbContext>();
         await dbContext.Database.MigrateAsync();
     }
+    else if (app.Environment.IsEnvironment("Testing"))
+    {
+        var dbContext = scope.ServiceProvider.GetRequiredService<ProductDbContext>();
+        await dbContext.Database.EnsureCreatedAsync();
+    }
 
     await IdentitySeed.SeedAsync(scope.ServiceProvider);
 }
 
-if (!app.Environment.IsDevelopment())
+if (!app.Environment.IsDevelopment() && !app.Environment.IsEnvironment("Testing"))
 {
+    app.UseForwardedHeaders(new ForwardedHeadersOptions
+    {
+        ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+    });
+    app.UseHsts();
     app.UseHttpsRedirection();
 }
 app.UseRouting();
@@ -69,3 +99,7 @@ app.MapHub<ChatHub>("/hubs/chat");
 app.MapHub<OrderHub>("/hubs/orders");
 
 app.Run();
+
+public partial class Program
+{
+}

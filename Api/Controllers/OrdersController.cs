@@ -53,7 +53,11 @@ public class OrdersController : ControllerBase
     {
         var userId = User.GetRequiredUserId();
         var order = await LoadOrderAsync(id);
-        EnsureCanAccessOrder(order, userId);
+        if (!CanAccessOrder(order, userId))
+        {
+            return Forbid();
+        }
+
         return Ok(MarketplaceMapper.MapOrderDetails(order));
     }
 
@@ -395,12 +399,11 @@ public class OrdersController : ControllerBase
             ?? throw new KeyNotFoundException("Listing was not found.");
     }
 
-    private void EnsureCanAccessOrder(Order order, Guid currentUserId)
+    private bool CanAccessOrder(Order order, Guid currentUserId)
     {
-        if (order.BuyerId != currentUserId && order.SellerId != currentUserId && !User.IsElevatedAdmin())
-        {
-            throw new UnauthorizedAccessException("You cannot access this order.");
-        }
+        return order.BuyerId == currentUserId ||
+               order.SellerId == currentUserId ||
+               User.IsElevatedAdmin();
     }
 
     private async Task EnsureCanPurchaseListingAsync(Listing listing, Guid buyerId, int requestedQuantity)

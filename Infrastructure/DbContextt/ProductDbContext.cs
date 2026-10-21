@@ -22,6 +22,7 @@ namespace Infrastructure.DbContextt
         public DbSet<Message> Messages { get; set; }
         public DbSet<Review> Reviews { get; set; }
         public DbSet<ListingReport> ListingReports { get; set; }
+        public DbSet<RefreshToken> RefreshTokens { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -44,6 +45,14 @@ namespace Infrastructure.DbContextt
             modelBuilder.Entity<Message>().ToTable("Messages");
             modelBuilder.Entity<Review>().ToTable("Reviews");
             modelBuilder.Entity<ListingReport>().ToTable("ListingReports");
+            modelBuilder.Entity<RefreshToken>().ToTable("RefreshTokens");
+
+            modelBuilder.Entity<RefreshToken>()
+                .HasIndex(token => token.TokenHash)
+                .IsUnique();
+
+            modelBuilder.Entity<RefreshToken>()
+                .HasIndex(token => new { token.UserId, token.FamilyId });
 
             modelBuilder.Entity<Category>()
                 .HasIndex(category => category.Name)
@@ -249,6 +258,12 @@ namespace Infrastructure.DbContextt
                 .WithOne(review => review.TargetUser)
                 .HasForeignKey(review => review.TargetUserId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<User>()
+                .HasMany(user => user.RefreshTokens)
+                .WithOne(token => token.User)
+                .HasForeignKey(token => token.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
 
             modelBuilder.Entity<ListingReport>()
                 .HasOne(report => report.Reporter)

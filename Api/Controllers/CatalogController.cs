@@ -1,4 +1,5 @@
 using Api.Contracts.Listings;
+using Api.Extensions;
 using Api.Mappers;
 using Domain.Enums;
 using Infrastructure.DbContextt;
@@ -37,10 +38,8 @@ public class CatalogController : ControllerBase
 
         var featuredListings = await _dbContext.Listings
             .AsNoTracking()
-            .Include(listing => listing.Category)
-            .Include(listing => listing.Owner)
-            .Include(listing => listing.Images)
             .Where(listing => featuredListingIds.Contains(listing.Id))
+            .Select(MarketplaceMapper.ListingSummaryProjection)
             .ToListAsync();
 
         var featuredListingOrder = featuredListingIds
@@ -54,7 +53,7 @@ public class CatalogController : ControllerBase
         return Ok(new CatalogHomeResponse
         {
             Categories = categories.Select(MarketplaceMapper.MapCategory).ToArray(),
-            FeaturedListings = featuredListings.Select(MarketplaceMapper.MapListingSummary).ToArray()
+            FeaturedListings = featuredListings
         });
     }
 
@@ -75,14 +74,15 @@ public class CatalogController : ControllerBase
         [FromQuery] Guid? categoryId,
         [FromQuery] string? city,
         [FromQuery] ListingCondition? condition,
-        [FromQuery] string? sortBy)
+        [FromQuery] string? sortBy,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = PaginationExtensions.DefaultPageSize)
     {
         var query = _dbContext.Listings
             .AsNoTracking()
-            .Include(listing => listing.Category)
-            .Include(listing => listing.Owner)
-            .Include(listing => listing.Images)
             .Where(listing => listing.Status == ListingStatus.Published || listing.Status == ListingStatus.Active);
+
+        (page, pageSize) = PaginationExtensions.Normalize(page, pageSize);
 
         if (!string.IsNullOrWhiteSpace(searchTerm))
         {
@@ -116,8 +116,15 @@ public class CatalogController : ControllerBase
             _ => query.OrderByDescending(listing => listing.CreatedAtUtc)
         };
 
-        var listings = await query.ToListAsync();
-        return Ok(listings.Select(MarketplaceMapper.MapListingSummary).ToArray());
+        var totalCount = await query.CountAsync();
+        var listings = await query
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(MarketplaceMapper.ListingSummaryProjection)
+            .ToArrayAsync();
+
+        Response.AddPaginationHeaders(page, pageSize, totalCount);
+        return Ok(listings);
     }
 
     [HttpGet("products/{id:guid}")]

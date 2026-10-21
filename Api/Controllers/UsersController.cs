@@ -112,6 +112,51 @@ public class UsersController : ControllerBase
         return await UploadAvatarInternalAsync(userId, file, cancellationToken);
     }
 
+    [AllowAnonymous]
+    [HttpGet("avatar/{fileName}")]
+    public async Task<IActionResult> GetAvatar(string fileName, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(fileName) || Path.GetFileName(fileName) != fileName)
+        {
+            return NotFound();
+        }
+
+        var avatarUrl = $"/uploads/avatars/{fileName}";
+        var owner = await _dbContext.Users
+            .AsNoTracking()
+            .Where(user => user.ProfileImageUrl == avatarUrl)
+            .Select(user => new { user.Id, user.IsBlocked })
+            .SingleOrDefaultAsync(cancellationToken);
+
+        if (owner is null || owner.IsBlocked && !CanAccessHiddenProfile(owner.Id))
+        {
+            return NotFound();
+        }
+
+        var contentType = Path.GetExtension(fileName).ToLowerInvariant() switch
+        {
+            ".jpg" or ".jpeg" => "image/jpeg",
+            ".png" => "image/png",
+            ".webp" => "image/webp",
+            ".gif" => "image/gif",
+            _ => null
+        };
+
+        if (contentType is null)
+        {
+            return NotFound();
+        }
+
+        var filePath = Path.Combine(ResolveWebRootPath(), "uploads", "avatars", fileName);
+        if (!System.IO.File.Exists(filePath))
+        {
+            return NotFound();
+        }
+
+        Response.Headers.CacheControl = "private, max-age=300";
+        return PhysicalFile(filePath, contentType, enableRangeProcessing: true);
+    }
+
     [HttpGet("{id:guid}/profile")]
     [AllowAnonymous]
     public async Task<ActionResult<PublicUserProfileResponse>> GetPublicProfile(Guid id)

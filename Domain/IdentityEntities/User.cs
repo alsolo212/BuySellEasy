@@ -34,5 +34,6 @@ namespace Domain.IdentityEntities
         public ICollection<Message> SentMessages { get; set; } = new List<Message>();
         public ICollection<Review> AuthoredReviews { get; set; } = new List<Review>();
         public ICollection<Review> ReceivedReviews { get; set; } = new List<Review>();
+        public ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
     }
 }
